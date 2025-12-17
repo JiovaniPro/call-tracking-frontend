@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { useTheme } from "../layout/AppShell";
 import {
   AlertTriangle,
   Bell,
@@ -57,13 +58,20 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   onMarkRead,
   onMarkAllRead,
 }) => {
+  const { isDark } = useTheme();
   if (!open) return null;
 
   const unreadCount = items.filter((n) => !n.read).length;
 
   return (
     <div className="absolute right-0 top-full z-50 mt-3 w-96">
-      <div className="overflow-hidden rounded-2xl border border-slate-100/80 bg-white/95 shadow-2xl shadow-slate-200/70 backdrop-blur-md ring-1 ring-white/80 transition dark:border-slate-800/80 dark:bg-[#0f172a]/95 dark:text-slate-50 dark:shadow-black/40 dark:ring-slate-900/60">
+      <div
+        className={`overflow-hidden rounded-2xl border shadow-2xl backdrop-blur-md transition ${
+          isDark
+            ? "border-slate-800/80 bg-slate-900/95 text-slate-50 shadow-black/40 ring-1 ring-slate-900/60"
+            : "border-slate-100/80 bg-white text-slate-900 shadow-slate-200/70 ring-1 ring-white/80"
+        }`}
+      >
         <div className="flex items-center justify-between px-4 py-3">
           <div>
             <p className="text-sm font-semibold">Notifications</p>
@@ -150,21 +158,17 @@ export const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 px-4 py-3">
-          <button
-            onClick={onMarkAllRead}
-            className="inline-flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-[13px] font-semibold text-slate-800 transition hover:-translate-y-0.5 hover:bg-slate-200 hover:shadow-sm dark:bg-white/5 dark:text-slate-100 dark:hover:bg-white/10"
-            style={{ cursor: "pointer" }}
-          >
-            Marquer tout comme lu
-          </button>
-          <a
-            href="/calls"
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#dd7fff] via-[#7264ff] to-[#54d4ef] px-3 py-2 text-[13px] font-semibold text-white shadow-sm shadow-indigo-200/70 transition hover:-translate-y-0.5 hover:shadow-lg dark:shadow-indigo-900/50"
-          >
-            Voir toutes les notifications
-          </a>
-        </div>
+        <a
+          href="/notifications"
+          className={`block w-full px-4 py-3 text-center text-[13px] font-semibold transition ${
+            isDark
+              ? "bg-slate-900 text-slate-100 hover:bg-slate-800"
+              : "bg-slate-50 text-slate-800 hover:bg-slate-100"
+          }`}
+          style={{ cursor: "pointer" }}
+        >
+          Voir toutes les notifications
+        </a>
       </div>
     </div>
   );

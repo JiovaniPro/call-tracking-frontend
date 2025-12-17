@@ -37,9 +37,6 @@ type FormState = {
   notifFrequency: "realtime" | "digest";
 };
 
-const inputBase =
-  "w-full rounded-xl border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[#7264ff]";
-
 const switchBase =
   "relative inline-flex h-6 w-11 items-center rounded-full transition";
 
@@ -90,16 +87,31 @@ function Select({
   options: { label: string; value: string }[];
   icon?: React.ReactNode;
 }) {
+  const { isDark } = useTheme();
+  const wrapperClasses = `flex items-center gap-2 rounded-xl border px-3 py-2 text-sm shadow-sm ring-1 ring-transparent transition focus-within:ring-2 focus-within:ring-[#7264ff] ${
+    isDark
+      ? "border-slate-700 bg-slate-900 text-slate-50"
+      : "border-slate-200 bg-white text-slate-900"
+  }`;
+
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-sm ring-1 ring-transparent transition focus-within:ring-2 focus-within:ring-[#7264ff] dark:border-slate-800 dark:bg-[#0f1a2f] dark:text-slate-100">
-      {icon && <span className="text-slate-400">{icon}</span>}
+    <div className={wrapperClasses}>
+      {icon && (
+        <span className={isDark ? "text-slate-400" : "text-slate-400"}>{icon}</span>
+      )}
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-transparent text-sm outline-none"
+        className={`w-full bg-transparent text-sm outline-none ${
+          isDark ? "text-slate-50" : "text-slate-900"
+        }`}
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
+          <option
+            key={opt.value}
+            value={opt.value}
+            className={isDark ? "bg-slate-900 text-slate-50" : "bg-white text-slate-900"}
+          >
             {opt.label}
           </option>
         ))}
@@ -179,7 +191,11 @@ function SettingsContent() {
             <input
               value={form.name}
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              className={`${inputBase} border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f1a2f] dark:text-slate-50`}
+              className={`w-full rounded-xl border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[#7264ff] ${
+                isDark
+                  ? "border-slate-700 bg-slate-900 text-slate-50 placeholder:text-slate-400"
+                  : "border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
+              }`}
               placeholder="Prénom Nom"
             />
           </div>
@@ -191,7 +207,11 @@ function SettingsContent() {
             <input
               value={form.email}
               readOnly
-              className={`${inputBase} cursor-not-allowed border-slate-200 bg-slate-50 text-slate-500 opacity-80 dark:border-slate-800 dark:bg-slate-900/50 dark:text-slate-400`}
+              className={`w-full cursor-not-allowed rounded-xl border px-3 py-2 text-sm opacity-80 transition focus:outline-none ${
+                isDark
+                  ? "border-slate-700 bg-slate-900/60 text-slate-400 placeholder:text-slate-500"
+                  : "border-slate-200 bg-slate-100 text-slate-500 placeholder:text-slate-400"
+              }`}
             />
           </div>
 
@@ -275,7 +295,11 @@ function SettingsContent() {
             <input
               value={form.workHours}
               onChange={(e) => setForm((f) => ({ ...f, workHours: e.target.value }))}
-              className={`${inputBase} border-slate-200 bg-white dark:border-slate-800 dark:bg-[#0f1a2f] dark:text-slate-50`}
+              className={`w-full rounded-xl border px-3 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-[#7264ff] ${
+                isDark
+                  ? "border-slate-700 bg-slate-900 text-slate-50 placeholder:text-slate-400"
+                  : "border-slate-200 bg-white text-slate-900 placeholder:text-slate-500"
+              }`}
               placeholder="08:00 - 19:00"
             />
           </div>
@@ -366,8 +390,12 @@ function SettingsContent() {
                   key={opt.value}
                   className={`flex cursor-pointer flex-col gap-1 rounded-xl border px-3 py-2 text-sm transition ${
                     form.remindersOrder === opt.value
-                      ? "border-[#7264ff] bg-[#f2ebff] text-[#362770] shadow-sm dark:border-indigo-400/60 dark:bg-indigo-950/30 dark:text-indigo-50"
-                      : "border-slate-200 bg-white hover:border-[#7264ff]/70 dark:border-slate-800 dark:bg-[#0f1a2f]"
+                      ? isDark
+                        ? "border-indigo-400/60 bg-indigo-950/30 text-indigo-50 shadow-sm"
+                        : "border-[#7264ff] bg-[#f2ebff] text-[#362770] shadow-sm"
+                      : isDark
+                      ? "border-slate-800 bg-slate-900 text-slate-100 hover:border-indigo-400/40 hover:bg-slate-800/80"
+                      : "border-slate-200 bg-slate-50 text-slate-900 hover:border-[#7264ff]/60 hover:bg-slate-100"
                   }`}
                 >
                   <input
