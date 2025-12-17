@@ -10,14 +10,15 @@ export type CallRow = {
   id: string;
   name: string;
   phone: string;
-  status: CallStatus;
+  status: string;
   lastCall: string;
-  nextReminder: string;
+  nextReminder: string | null;
 };
 
 type DataTableProps = {
   title: string;
   rows: CallRow[];
+  emptyMessage?: string;
 };
 
 const statusConfig: Record<
@@ -50,8 +51,18 @@ const statusConfig: Record<
   },
 };
 
-export const DataTable: React.FC<DataTableProps> = ({ title, rows }) => {
+export const DataTable: React.FC<DataTableProps> = ({ title, rows, emptyMessage = "Aucune donnée" }) => {
   const { isDark } = useTheme();
+
+  // Safe status lookup with fallback
+  const getStatusConfig = (status: string) => {
+    return statusConfig[status as CallStatus] || {
+      label: status,
+      lightClass: "bg-slate-50 text-slate-600 ring-1 ring-slate-100",
+      darkClass: "bg-slate-700 text-slate-200 ring-1 ring-slate-500/40",
+    };
+  };
+
   return (
     <div
       className={`flex flex-col rounded-2xl p-5 shadow-sm transition-all duration-300 hover:shadow-[0_12px_30px_rgba(106,44,255,0.25)] hover:-translate-y-1 ${
@@ -90,8 +101,14 @@ export const DataTable: React.FC<DataTableProps> = ({ title, rows }) => {
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
-              const status = statusConfig[row.status];
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-slate-500">
+                  {emptyMessage}
+                </td>
+              </tr>
+            ) : rows.map((row) => {
+              const status = getStatusConfig(row.status);
               return (
                 <tr
                   key={row.id}
@@ -116,7 +133,7 @@ export const DataTable: React.FC<DataTableProps> = ({ title, rows }) => {
                   </td>
                   <td className={`px-4 py-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>{row.lastCall}</td>
                   <td className={`px-4 py-3 ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-                    {row.nextReminder}
+                    {row.nextReminder || "-"}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button

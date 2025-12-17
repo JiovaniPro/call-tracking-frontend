@@ -1,142 +1,113 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { AppShell, useTheme } from "../../components/layout/AppShell";
 import { FilterBar } from "../../components/calls/FilterBar";
 import { ImportModal } from "../../components/calls/ImportModal";
-import {
-  CallsTable,
-  type CallRow,
-  type CallType,
-} from "../../components/calls/CallsTable";
+import { CallsTable } from "../../components/calls/CallsTable";
 import { DetailModal } from "../../components/calls/DetailModal";
 import { EditModal } from "../../components/calls/EditModal";
 import type { CallStatus } from "../../components/calls/StatusBadge";
+import { useCalls } from "../../lib/hooks";
+import { callsApi } from "../../lib/api";
+import { useRequireAuth } from "../../lib/auth";
+import type { Call, CallsFilter, CallStatus as ApiCallStatus, CallType as ApiCallType } from "../../types/api";
 
 type DateRange = "all" | "today" | "week" | "month" | "custom";
+type UICallType = "nouveau" | "rappel";
 
-const MOCK_CALLS: CallRow[] = [
-  {
-    id: "1",
-    name: "Marie Dupont",
-    firstName: "Marie",
-    lastName: "Dupont",
-    phone: "+33 6 12 34 56 78",
-    status: "intéressé",
-    lastCall: "Aujourd’hui - 09:24",
-    lastCallDate: "2025-12-16",
-    nextReminder: "Aujourd’hui - 16:00",
-    type: "nouveau",
-    email: "marie.dupont@example.com",
-    firstCallDate: "2025-11-20",
-    description:
-      "Prospect chaud pour la nouvelle offre. Intéressée par un accompagnement premium, à relancer après envoi du devis.",
-  },
-  {
-    id: "2",
-    name: "Paul Martin",
-    firstName: "Paul",
-    lastName: "Martin",
-    phone: "+33 7 98 76 54 32",
-    status: "pas intéressé",
-    lastCall: "Hier - 17:40",
-    lastCallDate: "2025-12-15",
-    nextReminder: null,
-    type: "nouveau",
-    email: "paul.martin@example.com",
-    firstCallDate: "2025-10-05",
-    description:
-      "Ne souhaite pas changer de solution cette année. À recontacter uniquement si nouvelle offre très compétitive.",
-  },
-  {
-    id: "3",
-    name: "Agence Horizon",
-    phone: "+33 1 45 23 89 10",
-    status: "répondeur",
-    lastCall: "Il y a 3 jours",
-    lastCallDate: "2025-12-13",
-    nextReminder: "Demain - 11:30",
-    type: "rappel",
-    email: "contact@agence-horizon.fr",
-    firstCallDate: "2025-09-12",
-    description:
-      "Agence intéressée par le suivi multi-campagnes. Plusieurs décideurs impliqués, processus de décision plus long.",
-  },
-  {
-    id: "4",
-    name: "Julien Moreau",
-    firstName: "Julien",
-    lastName: "Moreau",
-    phone: "+33 6 22 11 33 44",
-    status: "intéressé",
-    lastCall: "Cette semaine",
-    lastCallDate: "2025-12-12",
-    nextReminder: "Cette semaine",
-    type: "rappel",
-    email: "julien.moreau@example.com",
-    firstCallDate: "2025-11-02",
-  },
-  {
-    id: "5",
-    name: "Société Nova",
-    phone: "+33 4 91 23 45 67",
-    status: "hors cible",
-    lastCall: "Le 02/12/2025",
-    lastCallDate: "2025-12-02",
-    nextReminder: null,
-    type: "nouveau",
-    email: "direction@societe-nova.fr",
-    firstCallDate: "2025-09-28",
-  },
-  {
-    id: "6",
-    name: "Numéro inconnu",
-    phone: "+33 1 00 00 00 00",
-    status: "faux numéro",
-    lastCall: "Le 30/11/2025",
-    lastCallDate: "2025-11-30",
-    nextReminder: null,
-    type: "nouveau",
-  },
-  {
-    id: "7",
-    name: "Claire Bernard",
-    firstName: "Claire",
-    lastName: "Bernard",
-    phone: "+33 6 44 55 66 77",
-    status: "intéressé",
-    lastCall: "Cette semaine",
-    lastCallDate: "2025-12-11",
-    nextReminder: "La semaine prochaine",
-    type: "rappel",
-    email: "claire.bernard@example.com",
-    firstCallDate: "2025-11-15",
-  },
-  {
-    id: "8",
-    name: "Immo Paris 9",
-    phone: "+33 1 53 00 11 22",
-    status: "répondeur",
-    lastCall: "Aujourd’hui - 11:10",
-    lastCallDate: "2025-12-16",
-    nextReminder: "Aujourd’hui - 18:15",
-    type: "rappel",
-    email: "contact@immoparis9.fr",
-    firstCallDate: "2025-10-30",
-  },
-];
+// Map API status to UI status
+const mapApiStatusToUI = (status: ApiCallStatus): CallStatus => {
+  const map: Record<ApiCallStatus, CallStatus> = {
+    NEW: "intéressé",
+    IN_PROGRESS: "répondeur",
+    COMPLETED: "intéressé",
+    MISSED: "répondeur",
+    CANCELED: "pas intéressé",
+  };
+  return map[status] || "intéressé";
+};
+
+// Map UI status to API status
+const mapUIStatusToApi = (status: CallStatus): ApiCallStatus => {
+  const map: Record<CallStatus, ApiCallStatus> = {
+    "intéressé": "COMPLETED",
+    "pas intéressé": "CANCELED",
+    "répondeur": "MISSED",
+    "hors cible": "CANCELED",
+    "faux numéro": "CANCELED",
+  };
+  return map[status] || "NEW";
+};
+
+// Map API call to UI row
+const mapCallToRow = (call: Call) => ({
+  id: call.id,
+  name: call.notes?.split(" ")[0] || call.fromNumber,
+  firstName: call.notes?.split(" ")[0] || "",
+  lastName: call.notes?.split(" ").slice(1).join(" ") || "",
+  phone: call.direction === "INBOUND" ? call.fromNumber : call.toNumber,
+  status: mapApiStatusToUI(call.status),
+  lastCall: new Date(call.occurredAt).toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }),
+  lastCallDate: call.occurredAt.split("T")[0],
+  nextReminder: null,
+  type: (call.type === "FOLLOW_UP" ? "rappel" : "nouveau") as UICallType,
+  email: "",
+  firstCallDate: call.createdAt.split("T")[0],
+  description: call.notes || "",
+  // Keep original API data for updates
+  _apiData: call,
+});
+
+type CallRow = ReturnType<typeof mapCallToRow>;
 
 function CallsPageInner() {
   const { isDark } = useTheme();
-  const [calls, setCalls] = useState<CallRow[]>(MOCK_CALLS);
   const [search, setSearch] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<CallStatus[]>([]);
   const [dateRange, setDateRange] = useState<DateRange>("all");
-  const [callType, setCallType] = useState<CallType | "all">("all");
+  const [callType, setCallType] = useState<UICallType | "all">("all");
   const [importOpen, setImportOpen] = useState(false);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [feedbackType, setFeedbackType] = useState<"success" | "error">("success");
   const [selectedCall, setSelectedCall] = useState<CallRow | null>(null);
   const [modalMode, setModalMode] = useState<"detail" | "edit" | null>(null);
+
+  // Build API filters
+  const apiFilters = useMemo<CallsFilter>(() => {
+    const filters: CallsFilter = {};
+    if (search) filters.search = search;
+    if (selectedStatuses.length === 1) {
+      filters.status = mapUIStatusToApi(selectedStatuses[0]);
+    }
+    if (callType === "rappel") filters.type = "FOLLOW_UP";
+    else if (callType === "nouveau") filters.type = "PROSPECTION";
+
+    // Date range filters
+    const now = new Date();
+    if (dateRange === "today") {
+      filters.from = now.toISOString().split("T")[0];
+      filters.to = now.toISOString().split("T")[0];
+    } else if (dateRange === "week") {
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      filters.from = weekAgo.toISOString().split("T")[0];
+    } else if (dateRange === "month") {
+      const monthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      filters.from = monthAgo.toISOString().split("T")[0];
+    }
+
+    return filters;
+  }, [search, selectedStatuses, dateRange, callType]);
+
+  const { data: calls, isLoading, error, refetch } = useCalls(apiFilters);
+
+  const rows = useMemo(() => {
+    return (calls || []).map(mapCallToRow);
+  }, [calls]);
 
   const resetFilters = () => {
     setSearch("");
@@ -145,79 +116,92 @@ function CallsPageInner() {
     setCallType("all");
   };
 
-  const filteredCalls = useMemo(() => {
-    return calls.filter((call) => {
-      const normalizedSearch = search.trim().toLowerCase();
-      if (normalizedSearch) {
-        const haystack = `${call.name} ${call.phone}`.toLowerCase();
-        if (!haystack.includes(normalizedSearch)) {
-          return false;
-        }
+  const showFeedback = (message: string, type: "success" | "error" = "success") => {
+    setFeedbackMessage(message);
+    setFeedbackType(type);
+    setTimeout(() => setFeedbackMessage(null), 4000);
+  };
+
+  const handleImport = async (file: File) => {
+    try {
+      const result = await callsApi.import(file, false);
+      showFeedback(
+        `Import réussi : ${result.summary.imported} appels importés, ${result.summary.skipped} ignorés.`
+      );
+      refetch();
+    } catch (err) {
+      showFeedback(
+        err instanceof Error ? err.message : "Erreur lors de l'import",
+        "error"
+      );
+    }
+  };
+
+  const handleSaveCall = useCallback(
+    async (updated: CallRow) => {
+      try {
+        const apiData = updated._apiData;
+        await callsApi.update(apiData.id, {
+          status: mapUIStatusToApi(updated.status),
+          notes: updated.description || apiData.notes,
+        });
+        showFeedback("Modifications enregistrées avec succès.");
+        setModalMode("detail");
+        refetch();
+      } catch (err) {
+        showFeedback(
+          err instanceof Error ? err.message : "Erreur lors de la mise à jour",
+          "error"
+        );
       }
+    },
+    [refetch]
+  );
 
-      if (
-        selectedStatuses.length > 0 &&
-        !selectedStatuses.includes(call.status)
-      ) {
-        return false;
+  const handleDeleteCall = useCallback(
+    async (row: CallRow) => {
+      if (!confirm("Voulez-vous vraiment supprimer cet appel ?")) return;
+      try {
+        await callsApi.delete(row.id);
+        showFeedback("Appel supprimé avec succès.");
+        refetch();
+      } catch (err) {
+        showFeedback(
+          err instanceof Error ? err.message : "Erreur lors de la suppression",
+          "error"
+        );
       }
+    },
+    [refetch]
+  );
 
-      if (callType !== "all" && call.type !== callType) {
-        return false;
-      }
-
-      if (dateRange !== "all" && call.lastCallDate) {
-        const date = new Date(call.lastCallDate);
-        const now = new Date();
-        const diffMs = now.getTime() - date.getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-        if (dateRange === "today" && diffDays > 1) return false;
-        if (dateRange === "week" && diffDays > 7) return false;
-        if (dateRange === "month" && diffDays > 31) return false;
-        // "custom" laissé volontairement non implémenté (mock)
-      }
-
-      return true;
-    });
-  }, [calls, search, selectedStatuses, dateRange, callType]);
-
-  const handleMockImport = () => {
-    const importedRows: CallRow[] = [
-      {
-        id: `import-${Date.now()}`,
-        name: "Import Excel - Prospect 1",
-        phone: "+33 6 99 88 77 66",
-        status: "intéressé",
-        lastCall: "Import Excel",
-        lastCallDate: "2025-12-16",
-        nextReminder: "Demain - 10:00",
-        type: "nouveau",
-      },
-      {
-        id: `import-${Date.now()}-2`,
-        name: "Import Excel - Prospect 2",
-        phone: "+33 1 23 45 67 89",
-        status: "répondeur",
-        lastCall: "Import Excel",
-        lastCallDate: "2025-12-16",
-        nextReminder: "Cette semaine",
-        type: "rappel",
-      },
-    ];
-
-    setCalls((prev) => [...importedRows, ...prev]);
-    setFeedbackMessage(
-      "Fichier importé avec succès. Les lignes simulées ont été ajoutées à la liste."
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-[#7264ff]" />
+          <p className="text-sm text-slate-500">Chargement des appels...</p>
+        </div>
+      </div>
     );
-  };
+  }
 
-  const handleSaveCall = (updated: CallRow) => {
-    setCalls((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-    setSelectedCall(updated);
-    setModalMode("detail");
-    setFeedbackMessage("Modifications enregistrées (simulation).");
-  };
+  if (error) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-4 text-center">
+          <p className="text-sm font-medium text-red-700">Erreur de chargement</p>
+          <p className="mt-1 text-xs text-red-600">{error}</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-3 rounded-full bg-red-100 px-4 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -230,7 +214,7 @@ function CallsPageInner() {
               isDark ? "text-slate-400" : "text-slate-500"
             }`}
           >
-            Accédez à l’ensemble de vos appels entrants et sortants, filtrez
+            Accédez à l'ensemble de vos appels entrants et sortants, filtrez
             rapidement les priorités et pilotez vos rappels sans quitter le
             dashboard.
           </p>
@@ -250,13 +234,17 @@ function CallsPageInner() {
           onOpenImport={() => setImportOpen(true)}
         />
 
-        {/* Feedback global (import, édition, etc.) */}
+        {/* Feedback global */}
         {feedbackMessage && (
           <div
             className={`rounded-2xl border px-4 py-2 text-[11px] ${
-              isDark
-                ? "border-emerald-700/50 bg-emerald-900/20 text-emerald-200"
-                : "border-emerald-100 bg-emerald-50 text-emerald-700"
+              feedbackType === "success"
+                ? isDark
+                  ? "border-emerald-700/50 bg-emerald-900/20 text-emerald-200"
+                  : "border-emerald-100 bg-emerald-50 text-emerald-700"
+                : isDark
+                ? "border-red-700/50 bg-red-900/20 text-red-200"
+                : "border-red-100 bg-red-50 text-red-700"
             }`}
           >
             {feedbackMessage}
@@ -265,25 +253,23 @@ function CallsPageInner() {
 
         {/* Main table */}
         <CallsTable
-          rows={filteredCalls}
+          rows={rows}
           onView={(row) => {
-            setSelectedCall(row);
+            setSelectedCall(row as CallRow);
             setModalMode("detail");
           }}
           onEdit={(row) => {
-            setSelectedCall(row);
+            setSelectedCall(row as CallRow);
             setModalMode("edit");
           }}
-          onDelete={() => {
-            // TODO: confirmation de suppression (mock)
-          }}
+          onDelete={(row) => handleDeleteCall(row as CallRow)}
         />
       </div>
 
       <ImportModal
         open={importOpen}
         onClose={() => setImportOpen(false)}
-        onConfirm={handleMockImport}
+        onConfirm={handleImport}
       />
 
       <DetailModal
@@ -304,11 +290,19 @@ function CallsPageInner() {
 }
 
 export default function CallPage() {
+  const { isLoading } = useRequireAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-[#7264ff]" />
+      </div>
+    );
+  }
+
   return (
     <AppShell>
       <CallsPageInner />
     </AppShell>
   );
 }
-
-

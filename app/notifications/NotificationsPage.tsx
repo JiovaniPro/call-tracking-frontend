@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import {
   AlertTriangle,
   Bell,
@@ -10,95 +10,41 @@ import {
   PhoneCall,
 } from "lucide-react";
 import { AppShell, useTheme } from "../../components/layout/AppShell";
+import { useNotifications } from "../../lib/hooks";
+import { notificationsApi } from "../../lib/api";
+import { useRequireAuth } from "../../lib/auth";
+import type { Notification, NotificationType } from "../../types/api";
 
-type NotificationRow = {
-  id: string;
-  label: string;
-  time: string;
-  type: "reminder" | "calls" | "success" | "warning";
-  read: boolean;
-  href?: string;
-};
-
-const MOCK_NOTIFS: NotificationRow[] = [
+const typeConfig: Record<
+  NotificationType,
   {
-    id: "n-1",
-    label: "Rappel prévu aujourd’hui : Jean Dupont – 09:00",
-    time: "Il y a 12 min",
-    type: "reminder",
-    read: false,
-    href: "/reminders",
-  },
-  {
-    id: "n-2",
-    label: "3 rappels à effectuer aujourd’hui",
-    time: "Il y a 35 min",
-    type: "calls",
-    read: false,
-    href: "/reminders",
-  },
-  {
-    id: "n-3",
-    label: "Appel effectué : Marie Rakoto",
-    time: "Il y a 1 h",
-    type: "success",
-    read: false,
-    href: "/today",
-  },
-  {
-    id: "n-4",
-    label: "Faux numéro détecté",
-    time: "Hier",
-    type: "warning",
-    read: true,
-    href: "/calls",
-  },
-  {
-    id: "n-5",
-    label: "Synthèse quotidienne prête",
-    time: "Hier - 18:10",
-    type: "success",
-    read: true,
-  },
-  {
-    id: "n-6",
-    label: "Rappel déplacé : Agence Horizon à 16:30",
-    time: "Il y a 2 h",
-    type: "reminder",
-    read: true,
-    href: "/reminders",
-  },
-];
-
-const typeConfig = {
-  reminder: {
+    label: string;
+    color: string;
+    Icon: React.ElementType;
+  }
+> = {
+  REMINDER_DUE: {
     label: "Rappel",
     color:
       "bg-violet-50 text-violet-700 ring-1 ring-violet-100 dark:bg-violet-900/30 dark:text-violet-100 dark:ring-violet-800/50",
     Icon: Bell,
   },
-  calls: {
-    label: "Appels",
-    color:
-      "bg-sky-50 text-sky-700 ring-1 ring-sky-100 dark:bg-sky-900/30 dark:text-sky-100 dark:ring-sky-800/50",
-    Icon: PhoneCall,
-  },
-  success: {
-    label: "Succès",
-    color:
-      "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-100 dark:ring-emerald-800/50",
-    Icon: CheckCircle2,
-  },
-  warning: {
-    label: "Alerte",
+  CALL_MISSED: {
+    label: "Appel manqué",
     color:
       "bg-amber-50 text-amber-700 ring-1 ring-amber-100 dark:bg-amber-900/30 dark:text-amber-100 dark:ring-amber-800/50",
-    Icon: AlertTriangle,
+    Icon: PhoneCall,
+  },
+  SYSTEM: {
+    label: "Système",
+    color:
+      "bg-sky-50 text-sky-700 ring-1 ring-sky-100 dark:bg-sky-900/30 dark:text-sky-100 dark:ring-sky-800/50",
+    Icon: CheckCircle2,
   },
 };
 
 type ReadFilter = "all" | "unread" | "read";
-type TypeFilter = "all" | NotificationRow["type"];
+type TypeFilter = "all" | NotificationType;
 
 function FilterPill({
   active,
@@ -117,11 +63,30 @@ function FilterPill({
           ? "bg-gradient-to-r from-[#dd7fff] via-[#7264ff] to-[#54d4ef] text-white shadow-sm"
           : "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-200 dark:hover:bg-white/10"
       }`}
-      style={{ cursor: "pointer" }}
     >
       {children}
     </button>
   );
+}
+
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMinutes / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMinutes < 1) return "À l'instant";
+  if (diffMinutes < 60) return `Il y a ${diffMinutes} min`;
+  if (diffHours < 24) return `Il y a ${diffHours} h`;
+  if (diffDays === 1) return "Hier";
+  return date.toLocaleDateString("fr-FR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function NotificationsPageInner() {
@@ -129,16 +94,73 @@ function NotificationsPageInner() {
   const [readFilter, setReadFilter] = useState<ReadFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
 
+  const apiReadFilter = useMemo(() => {
+    if (readFilter === "unread") return false;
+    if (readFilter === "read") return true;
+    return undefined;
+  }, [readFilter]);
+
+  const { data: notifications, isLoading, error, refetch } = useNotifications(apiReadFilter);
+
   const filtered = useMemo(() => {
-    return MOCK_NOTIFS.filter((n) => {
-      if (readFilter === "unread" && n.read) return false;
-      if (readFilter === "read" && !n.read) return false;
+    return (notifications || []).filter((n) => {
       if (typeFilter !== "all" && n.type !== typeFilter) return false;
       return true;
     });
-  }, [readFilter, typeFilter]);
+  }, [notifications, typeFilter]);
 
-  const unreadCount = MOCK_NOTIFS.filter((n) => !n.read).length;
+  const unreadCount = useMemo(() => {
+    return (notifications || []).filter((n) => !n.read).length;
+  }, [notifications]);
+
+  const handleMarkAsRead = useCallback(
+    async (id: string) => {
+      try {
+        await notificationsApi.markAsRead(id);
+        refetch();
+      } catch (err) {
+        console.error("Failed to mark as read:", err);
+      }
+    },
+    [refetch]
+  );
+
+  const handleMarkAllAsRead = useCallback(async () => {
+    try {
+      await notificationsApi.markAllAsRead();
+      refetch();
+    } catch (err) {
+      console.error("Failed to mark all as read:", err);
+    }
+  }, [refetch]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-[#7264ff]" />
+          <p className="text-sm text-slate-500">Chargement des notifications...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="rounded-xl border border-red-200 bg-red-50 px-6 py-4 text-center">
+          <p className="text-sm font-medium text-red-700">Erreur de chargement</p>
+          <p className="mt-1 text-xs text-red-600">{error}</p>
+          <button
+            onClick={() => refetch()}
+            className="mt-3 rounded-full bg-red-100 px-4 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200"
+          >
+            Réessayer
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -149,8 +171,7 @@ function NotificationsPageInner() {
         </div>
         <h1 className="text-xl font-semibold">Toutes les notifications</h1>
         <p className={`max-w-2xl text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-          Historique mocké prêt à être connecté à l’API `/me/notifications`.
-          Filtres lecture et type inclus (mock).
+          Historique de vos notifications. Filtrez par statut de lecture ou par type.
         </p>
       </div>
 
@@ -166,11 +187,19 @@ function NotificationsPageInner() {
             <Filter className="h-4 w-4 text-slate-500 dark:text-slate-400" />
             <span>Filtres</span>
           </div>
-          <span
-            className="rounded-full bg-gradient-to-r from-[#dd7fff] via-[#7264ff] to-[#54d4ef] px-3 py-1 text-[11px] font-semibold text-white shadow-sm"
-          >
-            {unreadCount} non lue(s)
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-gradient-to-r from-[#dd7fff] via-[#7264ff] to-[#54d4ef] px-3 py-1 text-[11px] font-semibold text-white shadow-sm">
+              {unreadCount} non lue(s)
+            </span>
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllAsRead}
+                className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-medium text-slate-600 hover:bg-slate-200 dark:bg-white/5 dark:text-slate-300"
+              >
+                Tout marquer comme lu
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-2 py-3">
@@ -187,17 +216,20 @@ function NotificationsPageInner() {
           <FilterPill active={typeFilter === "all"} onClick={() => setTypeFilter("all")}>
             Tous types
           </FilterPill>
-          <FilterPill active={typeFilter === "reminder"} onClick={() => setTypeFilter("reminder")}>
-            Rappel
+          <FilterPill
+            active={typeFilter === "REMINDER_DUE"}
+            onClick={() => setTypeFilter("REMINDER_DUE")}
+          >
+            Rappels
           </FilterPill>
-          <FilterPill active={typeFilter === "calls"} onClick={() => setTypeFilter("calls")}>
-            Appels
+          <FilterPill
+            active={typeFilter === "CALL_MISSED"}
+            onClick={() => setTypeFilter("CALL_MISSED")}
+          >
+            Appels manqués
           </FilterPill>
-          <FilterPill active={typeFilter === "warning"} onClick={() => setTypeFilter("warning")}>
-            Alertes
-          </FilterPill>
-          <FilterPill active={typeFilter === "success"} onClick={() => setTypeFilter("success")}>
-            Succès
+          <FilterPill active={typeFilter === "SYSTEM"} onClick={() => setTypeFilter("SYSTEM")}>
+            Système
           </FilterPill>
         </div>
 
@@ -218,12 +250,12 @@ function NotificationsPageInner() {
             </div>
           ) : (
             filtered.map((notif) => {
-              const cfg = typeConfig[notif.type];
+              const cfg = typeConfig[notif.type] || typeConfig.SYSTEM;
               return (
-                <a
+                <div
                   key={notif.id}
-                  href={notif.href ?? "#"}
-                  className={`flex items-start gap-3 px-2 py-3 transition hover:-translate-y-0.5 ${
+                  onClick={() => !notif.read && handleMarkAsRead(notif.id)}
+                  className={`flex cursor-pointer items-start gap-3 px-2 py-3 transition hover:-translate-y-0.5 ${
                     notif.read
                       ? isDark
                         ? "hover:bg-white/5"
@@ -232,7 +264,6 @@ function NotificationsPageInner() {
                       ? "bg-white/5"
                       : "bg-slate-50"
                   }`}
-                  style={{ cursor: notif.href ? "pointer" : "default" }}
                 >
                   <div
                     className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl ${cfg.color}`}
@@ -242,7 +273,7 @@ function NotificationsPageInner() {
                   <div className="flex min-w-0 flex-1 flex-col gap-1">
                     <div className="flex items-center gap-2">
                       <span className="text-[13px] font-semibold leading-snug">
-                        {notif.label}
+                        {notif.title}
                       </span>
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${cfg.color}`}
@@ -250,8 +281,13 @@ function NotificationsPageInner() {
                         {cfg.label}
                       </span>
                     </div>
+                    {notif.body && (
+                      <p className="text-[12px] text-slate-600 dark:text-slate-400">
+                        {notif.body}
+                      </p>
+                    )}
                     <span className="text-[11px] text-slate-500 dark:text-slate-400">
-                      {notif.time}
+                      {formatTime(notif.createdAt)}
                     </span>
                   </div>
                   <span
@@ -263,7 +299,7 @@ function NotificationsPageInner() {
                   >
                     {notif.read ? "Lu" : "Non lu"}
                   </span>
-                </a>
+                </div>
               );
             })
           )}
@@ -276,9 +312,9 @@ function NotificationsPageInner() {
               : "border-slate-100 bg-slate-50 text-slate-600"
           }`}
         >
-          <span>Pagination mock — 1 / 1</span>
+          <span>{filtered.length} notification(s)</span>
           <span className="text-slate-500 dark:text-slate-400">
-            Scrolling interne si la liste est longue.
+            Mise à jour en temps réel
           </span>
         </div>
       </div>
@@ -287,11 +323,19 @@ function NotificationsPageInner() {
 }
 
 export default function NotificationsPage() {
+  const { isLoading } = useRequireAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-[#7264ff]" />
+      </div>
+    );
+  }
+
   return (
     <AppShell>
       <NotificationsPageInner />
     </AppShell>
   );
 }
-
-
