@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useRef } from "react";
-import { CloudUpload, FileSpreadsheet, X, CheckCircle2 } from "lucide-react";
+import { CloudUpload, FileSpreadsheet, X, CheckCircle2, AlertCircle } from "lucide-react";
 import { useTheme } from "../layout/AppShell";
+import { callsApi } from "../../lib/api";
+import type { ImportResult } from "../../types/api";
 
 type ImportModalProps = {
   open: boolean;
@@ -21,10 +23,12 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [previewResult, setPreviewResult] = useState<ImportResult | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   if (!open) return null;
 
-  const handleFileSelect = (file: File) => {
+  const handleFileSelect = async (file: File) => {
     const validTypes = [
       "text/csv",
       "application/vnd.ms-excel",
@@ -32,6 +36,18 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     ];
     if (validTypes.includes(file.type) || file.name.endsWith(".csv") || file.name.endsWith(".xlsx")) {
       setSelectedFile(file);
+      setShowPreview(false);
+      setPreviewResult(null);
+      
+      // Automatically run dryRun to show preview
+      try {
+        const result = await callsApi.import(file, true);
+        setPreviewResult(result);
+        setShowPreview(true);
+      } catch (err) {
+        // Preview failed, but file is still selected
+        console.error("Preview failed:", err);
+      }
     }
   };
 
@@ -65,6 +81,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
   const handleClose = () => {
     setSelectedFile(null);
+    setPreviewResult(null);
+    setShowPreview(false);
     onClose();
   };
 
@@ -154,6 +172,58 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           )}
         </div>
 
+        {/* Preview summary */}
+        {showPreview && previewResult && (
+          <div
+            className={`mb-4 rounded-2xl border px-4 py-3 text-[11px] ${
+              previewResult.summary.imported > 0
+                ? isDark
+                  ? "border-emerald-700/50 bg-emerald-900/20 text-emerald-200"
+                  : "border-emerald-100 bg-emerald-50 text-emerald-700"
+                : isDark
+                ? "border-amber-700/50 bg-amber-900/20 text-amber-200"
+                : "border-amber-100 bg-amber-50 text-amber-700"
+            }`}
+          >
+            <div className="flex items-start gap-2">
+              {previewResult.summary.imported > 0 ? (
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              ) : (
+                <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="flex-1">
+                <p className="font-medium mb-1">
+                  Résumé de l'import
+                </p>
+                <ul className="space-y-0.5">
+                  <li>
+                    <strong>{previewResult.summary.total}</strong> ligne{previewResult.summary.total > 1 ? "s" : ""} au total
+                  </li>
+                  <li>
+                    <strong className={previewResult.summary.imported > 0 ? "text-emerald-600 dark:text-emerald-300" : ""}>
+                      {previewResult.summary.imported}
+                    </strong> ligne{previewResult.summary.imported > 1 ? "s" : ""} valide{previewResult.summary.imported > 1 ? "s" : ""} prête{previewResult.summary.imported > 1 ? "s" : ""} à importer
+                  </li>
+                  {previewResult.summary.skipped > 0 && (
+                    <li>
+                      <strong className="text-amber-600 dark:text-amber-300">
+                        {previewResult.summary.skipped}
+                      </strong> ligne{previewResult.summary.skipped > 1 ? "s" : ""} ignorée{previewResult.summary.skipped > 1 ? "s" : ""}
+                    </li>
+                  )}
+                </ul>
+                {previewResult.validationErrors && previewResult.validationErrors.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-current/20">
+                    <p className="text-[10px] opacity-80">
+                      {previewResult.validationErrors.length} erreur{previewResult.validationErrors.length > 1 ? "s" : ""} de validation détectée{previewResult.validationErrors.length > 1 ? "s" : ""}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div
           className={`mb-4 flex items-center gap-2 rounded-2xl px-3 py-2 text-[11px] ${
             isDark ? "bg-white/5 text-slate-300" : "bg-slate-50 text-slate-600"
@@ -161,8 +231,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({
         >
           <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-400" />
           <p>
-            Cette action ajoutera les lignes importées directement dans la liste
-            des appels.
+            {showPreview && previewResult
+              ? "Cliquez sur 'Importer' pour confirmer l'importation."
+              : "Cette action ajoutera les lignes importées directement dans la liste des appels."}
           </p>
         </div>
 
@@ -182,7 +253,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           <button
             type="button"
             onClick={handleImport}
-            disabled={!selectedFile || isUploading}
+            disabled={!selectedFile || isUploading || (previewResult && previewResult.summary.imported === 0)}
             className="inline-flex items-center gap-1 rounded-full px-4 py-1.5 font-medium text-white shadow-md shadow-indigo-200/40 transition hover:-translate-y-0.5 hover:shadow-lg disabled:opacity-50 disabled:hover:translate-y-0"
             style={{ background: gradientPurple }}
           >

@@ -23,7 +23,18 @@ export interface AuthResponse {
 }
 
 // Calls
-export type CallStatus = "NEW" | "IN_PROGRESS" | "COMPLETED" | "MISSED" | "CANCELED";
+export type CallStatus = 
+  | "A_CONTACTER"
+  | "NE_REPOND_PAS"
+  | "RAPPEL"
+  | "NE_TRAVAILLE_PAS_EN_SUISSE"
+  | "RENDEZ_VOUS_FIXE"
+  | "RENDEZ_VOUS_REFIXE"
+  | "MAUVAIS_NUMERO"
+  | "PAS_INTERESSE"
+  | "FAIRE_MAIL"
+  | "DOUBLONS"
+  | "DEJA_CLIENT";
 export type CallDirection = "INBOUND" | "OUTBOUND";
 export type CallType = "PROSPECTION" | "SUPPORT" | "FOLLOW_UP" | "OTHER";
 
@@ -40,6 +51,11 @@ export interface Call {
   createdAt: string;
   updatedAt: string;
   userId: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  recallDate?: string | null;
+  recallTimeSlot?: string | null;
   statusHistory?: CallStatusHistory[];
 }
 
@@ -59,6 +75,11 @@ export interface CreateCallRequest {
   durationSec?: number;
   notes?: string;
   occurredAt?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  recallDate?: string;
+  recallTimeSlot?: string;
 }
 
 export interface UpdateCallRequest {
@@ -70,6 +91,11 @@ export interface UpdateCallRequest {
   durationSec?: number;
   notes?: string;
   occurredAt?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  recallDate?: string | null;
+  recallTimeSlot?: string | null;
 }
 
 export interface CallsFilter {
@@ -130,9 +156,8 @@ export interface KPIReport {
     to: string;
   };
   totalCalls: number;
-  completedCalls: number;
-  missedCalls: number;
   totalDurationSec: number;
+  appointmentsThisMonth?: number;
 }
 
 export interface TodayReport {
@@ -142,6 +167,8 @@ export interface TodayReport {
   };
   calls: Call[];
   reminders: Reminder[];
+  callsToday?: number;
+  appointmentsToday?: number;
 }
 
 // Settings

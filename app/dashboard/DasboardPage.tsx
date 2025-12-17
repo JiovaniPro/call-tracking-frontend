@@ -64,26 +64,26 @@ function DashboardContent() {
   const kpiCards = [
     {
       label: "Appels aujourd'hui",
-      value: todayData?.calls.length.toString() || "0",
-      helper: `sur la période ${kpiRange === "day" ? "du jour" : kpiRange === "week" ? "de la semaine" : "du mois"}`,
+      value: todayData?.callsToday?.toString() || todayData?.calls.length.toString() || "0",
+      helper: "appels effectués aujourd'hui",
       trend: { value: "+0%", direction: "up" as const },
     },
     {
-      label: "Appels ce mois-ci",
-      value: kpi?.totalCalls.toString() || "0",
-      helper: `${kpi?.completedCalls || 0} complétés`,
+      label: "Rendez-vous aujourd'hui",
+      value: todayData?.appointmentsToday?.toString() || "0",
+      helper: "rendez-vous fixés aujourd'hui",
       trend: { value: "+0%", direction: "up" as const },
     },
     {
-      label: "Appels manqués",
-      value: kpi?.missedCalls.toString() || "0",
-      helper: "à rappeler",
-      trend: { value: "-0%", direction: "down" as const },
+      label: "Rendez-vous ce mois",
+      value: kpi?.appointmentsThisMonth?.toString() || "0",
+      helper: "total de rendez-vous fixés ce mois",
+      trend: { value: "+0%", direction: "up" as const },
     },
     {
-      label: "Durée totale",
-      value: kpi ? formatDuration(kpi.totalDurationSec) : "0 min",
-      helper: "temps d'appel cumulé",
+      label: "Rappels à faire",
+      value: todayData?.reminders.length.toString() || "0",
+      helper: "rappels prévus aujourd'hui",
       trend: { value: "+0%", direction: "up" as const },
     },
   ];
@@ -141,14 +141,9 @@ function DashboardContent() {
           points={monthlyCalls}
         />
         <div className="grid gap-4">
-          {kpiCards.slice(0, 2).map((card) => (
+          {kpiCards.map((card) => (
             <StatCard key={card.label} {...card} />
           ))}
-          <div className="grid grid-cols-2 gap-4">
-            {kpiCards.slice(2).map((card) => (
-              <StatCard key={card.label} {...card} />
-            ))}
-          </div>
         </div>
       </div>
 

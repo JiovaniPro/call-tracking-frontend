@@ -7,61 +7,55 @@ import { ImportModal } from "../../components/calls/ImportModal";
 import { CallsTable } from "../../components/calls/CallsTable";
 import { DetailModal } from "../../components/calls/DetailModal";
 import { EditModal } from "../../components/calls/EditModal";
-import type { CallStatus } from "../../components/calls/StatusBadge";
 import { useCalls } from "../../lib/hooks";
 import { callsApi } from "../../lib/api";
 import { useRequireAuth } from "../../lib/auth";
+import { mapApiStatusToUI, mapUIStatusToApi, STATUSES_REQUIRING_RECALL } from "../../lib/statusMapping";
 import type { Call, CallsFilter, CallStatus as ApiCallStatus, CallType as ApiCallType } from "../../types/api";
+import type { CallStatus } from "../../components/calls/StatusBadge";
 
 type DateRange = "all" | "today" | "week" | "month" | "custom";
 type UICallType = "nouveau" | "rappel";
 
-// Map API status to UI status
-const mapApiStatusToUI = (status: ApiCallStatus): CallStatus => {
-  const map: Record<ApiCallStatus, CallStatus> = {
-    NEW: "intéressé",
-    IN_PROGRESS: "répondeur",
-    COMPLETED: "intéressé",
-    MISSED: "répondeur",
-    CANCELED: "pas intéressé",
-  };
-  return map[status] || "intéressé";
-};
-
-// Map UI status to API status
-const mapUIStatusToApi = (status: CallStatus): ApiCallStatus => {
-  const map: Record<CallStatus, ApiCallStatus> = {
-    "intéressé": "COMPLETED",
-    "pas intéressé": "CANCELED",
-    "répondeur": "MISSED",
-    "hors cible": "CANCELED",
-    "faux numéro": "CANCELED",
-  };
-  return map[status] || "NEW";
-};
-
 // Map API call to UI row
-const mapCallToRow = (call: Call) => ({
-  id: call.id,
-  name: call.notes?.split(" ")[0] || call.fromNumber,
-  firstName: call.notes?.split(" ")[0] || "",
-  lastName: call.notes?.split(" ").slice(1).join(" ") || "",
-  phone: call.direction === "INBOUND" ? call.fromNumber : call.toNumber,
-  status: mapApiStatusToUI(call.status),
-  lastCall: new Date(call.occurredAt).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }),
-  lastCallDate: call.occurredAt.split("T")[0],
-  nextReminder: null,
-  type: (call.type === "FOLLOW_UP" ? "rappel" : "nouveau") as UICallType,
-  email: "",
-  firstCallDate: call.createdAt.split("T")[0],
-  description: call.notes || "",
-  // Keep original API data for updates
-  _apiData: call,
-});
+const mapCallToRow = (call: Call) => {
+  const firstName = call.firstName || "";
+  const lastName = call.lastName || "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || call.notes?.split("\n")[0]?.replace("Prénom: ", "").replace("Nom: ", "") || call.fromNumber;
+  
+  // Format recall information
+  let nextReminder: string | null = null;
+  if (call.recallDate) {
+    const recallDateStr = call.recallDate.split("T")[0];
+    if (call.recallTimeSlot) {
+      nextReminder = `${recallDateStr} • ${call.recallTimeSlot}`;
+    } else {
+      nextReminder = recallDateStr;
+    }
+  }
+  
+  return {
+    id: call.id,
+    name: fullName,
+    firstName: firstName,
+    lastName: lastName,
+    phone: call.direction === "INBOUND" ? call.fromNumber : call.toNumber,
+    status: mapApiStatusToUI(call.status),
+    lastCall: new Date(call.occurredAt).toLocaleDateString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }),
+    lastCallDate: call.occurredAt.split("T")[0],
+    nextReminder: nextReminder,
+    type: (call.type === "FOLLOW_UP" ? "rappel" : "nouveau") as UICallType,
+    email: call.email || "",
+    firstCallDate: call.createdAt.split("T")[0],
+    description: call.notes || "",
+    // Keep original API data for updates
+    _apiData: call,
+  };
+};
 
 type CallRow = ReturnType<typeof mapCallToRow>;
 
@@ -106,7 +100,11 @@ function CallsPageInner() {
   const { data: calls, isLoading, error, refetch } = useCalls(apiFilters);
 
   const rows = useMemo(() => {
-    return (calls || []).map(mapCallToRow);
+    // Only show calls that haven't been classified yet (status = A_CONTACTER)
+    // After classification, they appear in "Appels du jour"
+    return (calls || [])
+      .filter((call) => call.status === "A_CONTACTER")
+      .map(mapCallToRow);
   }, [calls]);
 
   const resetFilters = () => {
@@ -141,10 +139,37 @@ function CallsPageInner() {
     async (updated: CallRow) => {
       try {
         const apiData = updated._apiData;
+        const newStatus = mapUIStatusToApi(updated.status);
+        
+        // Prepare recall data if status requires it
+        let recallDate: string | null = null;
+        let recallTimeSlot: string | null = null;
+        
+        if (STATUSES_REQUIRING_RECALL.includes(updated.status)) {
+          if (updated.nextReminder) {
+            // Parse nextReminder format: "YYYY-MM-DD • HH:MM – HH:MM"
+            const parts = updated.nextReminder.split(" • ");
+            if (parts.length === 2) {
+              recallDate = parts[0];
+              recallTimeSlot = parts[1];
+            } else if (parts.length === 1) {
+              // Only date provided
+              recallDate = parts[0];
+            }
+          }
+        }
+        
         await callsApi.update(apiData.id, {
-          status: mapUIStatusToApi(updated.status),
+          status: newStatus,
           notes: updated.description || apiData.notes,
+          firstName: updated.firstName,
+          lastName: updated.lastName,
+          email: updated.email,
+          toNumber: updated.phone,
+          recallDate: recallDate || null,
+          recallTimeSlot: recallTimeSlot || null,
         });
+        
         showFeedback("Modifications enregistrées avec succès.");
         setModalMode("detail");
         refetch();

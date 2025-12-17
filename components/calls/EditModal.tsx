@@ -6,6 +6,7 @@ import { useTheme } from "../layout/AppShell";
 import { StatusBadge, type CallStatus } from "./StatusBadge";
 import type { CallRow, CallType } from "./CallsTable";
 import { DatePicker } from "./DatePicker";
+import { ALL_UI_STATUSES, STATUSES_REQUIRING_RECALL } from "../../lib/statusMapping";
 
 type EditModalProps = {
   open: boolean;
@@ -25,14 +26,6 @@ type EditableState = {
   nextReminderSlot: string;
   description: string;
 };
-
-const ALL_STATUSES: CallStatus[] = [
-  "intéressé",
-  "pas intéressé",
-  "répondeur",
-  "hors cible",
-  "faux numéro",
-];
 
 const TIME_SLOTS = [
   "08:00 – 09:00",
@@ -66,8 +59,19 @@ export const EditModal: React.FC<EditModalProps> = ({
     const firstName = call.firstName ?? fullName.split(" ")[0] ?? "";
     const lastName = call.lastName ?? fullName.split(" ").slice(1).join(" ");
 
-    // On ne tente pas de parser les anciennes valeurs libres :
-    // on initialise la date et le créneau vides pour garder un comportement prévisible.
+    // Parse recall information from nextReminder
+    let recallDate = "";
+    let recallSlot = "";
+    if (call.nextReminder) {
+      const parts = call.nextReminder.split(" • ");
+      if (parts.length === 2) {
+        recallDate = parts[0];
+        recallSlot = parts[1];
+      } else if (parts.length === 1) {
+        recallDate = parts[0];
+      }
+    }
+    
     setForm({
       firstName,
       lastName,
@@ -75,8 +79,8 @@ export const EditModal: React.FC<EditModalProps> = ({
       email: call.email ?? "",
       status: call.status,
       type: call.type,
-      nextReminderDate: "",
-      nextReminderSlot: "",
+      nextReminderDate: recallDate,
+      nextReminderSlot: recallSlot,
       description: call.description ?? "",
     });
   }, [open, call]);
@@ -94,6 +98,12 @@ export const EditModal: React.FC<EditModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validate recall information if status requires it
+    if (STATUSES_REQUIRING_RECALL.includes(form.status) && !form.nextReminderDate.trim()) {
+      alert("Veuillez sélectionner une date de rappel pour ce statut.");
+      return;
+    }
 
     const hasReminder =
       form.nextReminderDate.trim().length > 0 ||
@@ -235,9 +245,9 @@ export const EditModal: React.FC<EditModalProps> = ({
                     }
                     className={`${inputBase} ${
                       isDark ? inputDark : inputLight
-                    } max-w-[150px]`}
+                    } max-w-[200px]`}
                   >
-                    {ALL_STATUSES.map((status) => (
+                    {ALL_UI_STATUSES.map((status) => (
                       <option key={status} value={status}>
                         {status}
                       </option>
@@ -266,45 +276,52 @@ export const EditModal: React.FC<EditModalProps> = ({
             </div>
           </section>
 
-          {/* Bloc rappel */}
-          <section>
-            <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-              Prochain rappel
-            </h3>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-slate-400">
-                  Date de rappel
-                </label>
-                <DatePicker
-                  value={form.nextReminderDate}
-                  onChange={(date) => handleChange("nextReminderDate", date)}
-                  placeholder="Sélectionner une date"
-                />
+          {/* Bloc rappel - Affiché uniquement si le statut nécessite un rappel */}
+          {STATUSES_REQUIRING_RECALL.includes(form.status) && (
+            <section>
+              <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Informations de rappel <span className="text-red-500">*</span>
+              </h3>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400">
+                    Date de rappel <span className="text-red-500">*</span>
+                  </label>
+                  <DatePicker
+                    value={form.nextReminderDate}
+                    onChange={(date) => handleChange("nextReminderDate", date)}
+                    placeholder="Sélectionner une date"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] text-slate-400">
+                    Créneau horaire
+                  </label>
+                  <select
+                    value={form.nextReminderSlot}
+                    onChange={(e) =>
+                      handleChange("nextReminderSlot", e.target.value)
+                    }
+                    className={`${inputBase} ${
+                      isDark ? inputDark : inputLight
+                    }`}
+                  >
+                    <option value="">Non planifié</option>
+                    {TIME_SLOTS.map((slot) => (
+                      <option key={slot} value={slot}>
+                        {slot}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-slate-400">
-                  Créneau horaire
-                </label>
-                <select
-                  value={form.nextReminderSlot}
-                  onChange={(e) =>
-                    handleChange("nextReminderSlot", e.target.value)
-                  }
-                  className={`${inputBase} ${
-                    isDark ? inputDark : inputLight
-                  }`}
-                >
-                  <option value="">Non planifié</option>
-                  {TIME_SLOTS.map((slot) => (
-                    <option key={slot} value={slot}>
-                      {slot.replace(":", "h").replace(":", "h")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </section>
+              {STATUSES_REQUIRING_RECALL.includes(form.status) && !form.nextReminderDate && (
+                <p className="mt-2 text-[10px] text-amber-600 dark:text-amber-400">
+                  ⚠️ Une date de rappel est requise pour ce statut
+                </p>
+              )}
+            </section>
+          )}
 
           {/* Bloc notes */}
           <section>

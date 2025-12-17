@@ -250,36 +250,38 @@ export const DetailModal: React.FC<DetailModalProps> = ({
                 </div>
               </div>
             </div>
-            <div className="mt-4">
-              <div className="space-y-2">
-                <p className={`text-[11px] font-medium ${
-                  isDark ? "text-slate-400" : "text-slate-500"
-                }`}>
-                  Prochaine date de rappel
-                </p>
-                <div className={`rounded-xl px-3 py-2.5 ${
-                  call.nextReminder
-                    ? isDark
-                      ? "bg-emerald-900/20 border border-emerald-700/50"
-                      : "bg-emerald-50 border border-emerald-200"
-                    : isDark
-                    ? "bg-slate-800/50 border border-slate-700"
-                    : "bg-slate-50 border border-slate-200"
-                }`}>
-                  <p className={`text-sm font-semibold ${
-                    call.nextReminder
-                      ? isDark
-                        ? "text-emerald-200"
-                        : "text-emerald-700"
-                      : isDark
-                      ? "text-slate-400"
-                      : "text-slate-500"
+            {/* Afficher les informations de rappel si elles existent */}
+            {call.nextReminder && (
+              <div className="mt-4">
+                <div className="space-y-2">
+                  <p className={`text-[11px] font-medium ${
+                    isDark ? "text-slate-400" : "text-slate-500"
                   }`}>
-                    {call.nextReminder ?? "Aucun rappel planifié"}
+                    Informations de rappel
                   </p>
+                  <div className={`rounded-xl px-3 py-2.5 ${
+                    isDark
+                      ? "bg-blue-900/20 border border-blue-700/50"
+                      : "bg-blue-50 border border-blue-200"
+                  }`}>
+                    <div className="space-y-1">
+                      <p className={`text-sm font-semibold ${
+                        isDark ? "text-blue-200" : "text-blue-700"
+                      }`}>
+                        📅 {call.nextReminder.split(" • ")[0]}
+                      </p>
+                      {call.nextReminder.includes(" • ") && (
+                        <p className={`text-xs ${
+                          isDark ? "text-blue-300" : "text-blue-600"
+                        }`}>
+                          Créneau: {call.nextReminder.split(" • ")[1]}
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </section>
 
           {/* Section 3 – Notes & description */}

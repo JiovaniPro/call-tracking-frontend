@@ -7,35 +7,50 @@ import { StatusBadge } from "../../components/calls/StatusBadge";
 import { DetailModal } from "../../components/calls/DetailModal";
 import { useTodayReport } from "../../lib/hooks";
 import { useRequireAuth } from "../../lib/auth";
+import { mapApiStatusToUI } from "../../lib/statusMapping";
 import type { Call } from "../../types/api";
-
-// Map API status to UI status
-const mapApiStatusToUI = (status: string): "intéressé" | "pas intéressé" | "répondeur" | "hors cible" | "faux numéro" => {
-  const map: Record<string, "intéressé" | "pas intéressé" | "répondeur" | "hors cible" | "faux numéro"> = {
-    NEW: "intéressé",
-    IN_PROGRESS: "répondeur",
-    COMPLETED: "intéressé",
-    MISSED: "répondeur",
-    CANCELED: "pas intéressé",
-  };
-  return map[status] || "intéressé";
-};
+import type { CallStatus } from "../../components/calls/StatusBadge";
 
 // Map API call to UI format
-const mapCallToUI = (call: Call) => ({
-  id: call.id,
-  name: call.notes?.split(" ")[0] || call.fromNumber,
-  phone: call.direction === "INBOUND" ? call.fromNumber : call.toNumber,
-  status: mapApiStatusToUI(call.status),
-  time: new Date(call.occurredAt).toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }),
-  type: call.type === "FOLLOW_UP" ? "rappel" : "nouveau",
-  notes: call.notes || "",
-});
+const mapCallToUI = (call: Call) => {
+  const firstName = call.firstName || "";
+  const lastName = call.lastName || "";
+  const fullName = [firstName, lastName].filter(Boolean).join(" ") || call.notes?.split("\n")[0]?.replace("Prénom: ", "").replace("Nom: ", "") || call.fromNumber;
+  
+  // Format recall time slot if available
+  let recallInfo = "";
+  if (call.recallTimeSlot) {
+    recallInfo = call.recallTimeSlot;
+  } else if (call.recallDate) {
+    recallInfo = new Date(call.recallDate).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+  
+  return {
+    id: call.id,
+    name: fullName,
+    phone: call.direction === "INBOUND" ? call.fromNumber : call.toNumber,
+    status: mapApiStatusToUI(call.status),
+    time: call.recallDate 
+      ? new Date(call.recallDate).toLocaleTimeString("fr-FR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : new Date(call.occurredAt).toLocaleTimeString("fr-FR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+    recallTimeSlot: recallInfo,
+    type: call.type === "FOLLOW_UP" ? "rappel" : "nouveau",
+    notes: call.notes || "",
+  };
+};
 
-type UICall = ReturnType<typeof mapCallToUI>;
+type UICall = ReturnType<typeof mapCallToUI> & {
+  recallTimeSlot?: string;
+};
 
 // Map to CallRow for DetailModal
 const mapToCallRow = (call: UICall) => ({
@@ -187,19 +202,18 @@ function TodayCallsSection() {
                           >
                             {call.phone}
                           </span>
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                              call.type === "nouveau"
-                                ? isDark
-                                  ? "bg-emerald-900/40 text-emerald-300"
-                                  : "bg-emerald-50 text-emerald-600"
-                                : isDark
-                                ? "bg-sky-900/40 text-sky-300"
-                                : "bg-sky-50 text-sky-600"
-                            }`}
-                          >
-                            {call.type === "nouveau" ? "Nouveau" : "Rappel"}
-                          </span>
+                          <StatusBadge status={call.status} />
+                          {call.recallTimeSlot && (
+                            <span
+                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                isDark
+                                  ? "bg-blue-900/40 text-blue-300"
+                                  : "bg-blue-50 text-blue-600"
+                              }`}
+                            >
+                              📅 {call.recallTimeSlot}
+                            </span>
+                          )}
                         </div>
                       </div>
 

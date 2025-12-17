@@ -1,7 +1,7 @@
  "use client";
 
 import React from "react";
-import { Eye, SquarePen, Trash2 } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useTheme } from "../layout/AppShell";
 import { StatusBadge, type CallStatus } from "./StatusBadge";
 import { CopyButton } from "./CopyButton";
@@ -93,12 +93,6 @@ export const CallsTable: React.FC<CallsTableProps> = ({
                 <th className="sticky top-0 z-10 bg-inherit px-4 py-2">
                   Dernier appel
                 </th>
-                <th className="sticky top-0 z-10 bg-inherit px-4 py-2">
-                  Prochain rappel
-                </th>
-                <th className="sticky top-0 z-10 bg-inherit px-4 py-2">
-                  Type d’appel
-                </th>
                 <th className="sticky top-0 z-10 bg-inherit px-4 py-2 text-right">
                   Actions
                 </th>
@@ -152,33 +146,11 @@ export const CallsTable: React.FC<CallsTableProps> = ({
                   >
                     {row.lastCall}
                   </td>
-                  <td
-                    className={`whitespace-nowrap px-4 py-3 ${
-                      isDark ? "text-slate-400" : "text-slate-500"
-                    }`}
-                  >
-                    {row.nextReminder ?? "—"}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                        row.type === "nouveau"
-                          ? isDark
-                            ? "bg-emerald-900/40 text-emerald-300"
-                            : "bg-emerald-50 text-emerald-600"
-                          : isDark
-                          ? "bg-sky-900/40 text-sky-300"
-                          : "bg-sky-50 text-sky-600"
-                      }`}
-                    >
-                      {row.type === "nouveau" ? "Nouveau" : "Rappel"}
-                    </span>
-                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-1.5">
                       <button
                         type="button"
-                        aria-label="Voir les détails de l’appel"
+                        aria-label="Voir les détails de l'appel"
                         onClick={() => onView?.(row)}
                         className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
                           isDark
@@ -189,32 +161,6 @@ export const CallsTable: React.FC<CallsTableProps> = ({
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        aria-label="Modifier cet appel"
-                        onClick={() => onEdit?.(row)}
-                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
-                          isDark
-                            ? "bg-white/5 text-slate-200 hover:bg-white/10"
-                            : "bg-slate-50 text-slate-600 hover:bg-slate-100"
-                        }`}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <SquarePen className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button"
-                        aria-label="Supprimer cet appel"
-                        onClick={() => onDelete?.(row)}
-                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
-                          isDark
-                            ? "bg-rose-900/30 text-rose-200 hover:bg-rose-900/60"
-                            : "bg-rose-50 text-rose-500 hover:bg-rose-100"
-                        }`}
-                        style={{ cursor: "pointer" }}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
                     </div>
                   </td>
                 </tr>
@@ -223,7 +169,7 @@ export const CallsTable: React.FC<CallsTableProps> = ({
               {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={5}
                     className="py-10 text-center text-xs text-slate-400"
                   >
                     Aucun appel ne correspond à vos filtres. Essayez de
