@@ -113,7 +113,7 @@ export const AdminRemindersTable: React.FC<AdminRemindersTableProps> = ({
                     <td className="py-3 pr-4">
                       <button
                         onClick={() => handleViewUser(reminder.user.id)}
-                        className="flex items-center gap-1 text-left hover:underline"
+                        className="flex items-center gap-1 text-left hover:underline cursor-pointer"
                       >
                         {reminder.user.firstName || reminder.user.lastName
                           ? `${reminder.user.firstName || ""} ${reminder.user.lastName || ""}`.trim()

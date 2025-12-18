@@ -159,7 +159,7 @@ export const EmployeesTable: React.FC<EmployeesTableProps> = ({
                     {onView && (
                       <button
                         onClick={() => onView(user)}
-                        className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs transition ${
+                        className={`flex items-center gap-1 rounded-lg px-2 py-1 text-xs transition cursor-pointer ${
                           isDark
                             ? "text-slate-400 hover:bg-slate-800 hover:text-white"
                             : "text-slate-500 hover:bg-slate-100 hover:text-slate-900"

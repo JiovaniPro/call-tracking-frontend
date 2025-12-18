@@ -4,6 +4,7 @@ import React from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "../layout/AppShell";
 import { StatusBadge } from "../calls/StatusBadge";
+import { mapApiStatusToUI } from "../../lib/statusMapping";
 import type { AdminCallsResponse } from "../../types/api";
 import dayjs from "dayjs";
 import { ChevronLeft, ChevronRight, Eye } from "lucide-react";
@@ -91,7 +92,7 @@ export const AdminCallsTable: React.FC<AdminCallsTableProps> = ({
                   <td className="py-3 pr-4">
                     <button
                       onClick={() => handleViewUser(call.owner.id)}
-                      className="flex items-center gap-1 text-left hover:underline"
+                      className="flex items-center gap-1 text-left hover:underline cursor-pointer"
                     >
                       {call.owner.firstName || call.owner.lastName
                         ? `${call.owner.firstName || ""} ${call.owner.lastName || ""}`.trim()
@@ -106,7 +107,7 @@ export const AdminCallsTable: React.FC<AdminCallsTableProps> = ({
                   </td>
                   <td className="py-3 pr-4">{call.toNumber}</td>
                   <td className="py-3 pr-4">
-                    <StatusBadge status={call.status} />
+                    <StatusBadge status={mapApiStatusToUI(call.status)} />
                   </td>
                   <td className="py-3 pr-4 text-xs">{call.type}</td>
                   <td className="py-3 pr-4 text-xs max-w-xs truncate">
@@ -132,9 +133,9 @@ export const AdminCallsTable: React.FC<AdminCallsTableProps> = ({
               className={`rounded-lg px-3 py-1.5 text-xs transition ${
                 pagination.page === 1
                   ? "cursor-not-allowed opacity-50"
-                  : isDark
+                  : "cursor-pointer " + (isDark
                   ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200")
               }`}
             >
               <ChevronLeft className="h-4 w-4" />
@@ -145,9 +146,9 @@ export const AdminCallsTable: React.FC<AdminCallsTableProps> = ({
               className={`rounded-lg px-3 py-1.5 text-xs transition ${
                 pagination.page === pagination.totalPages
                   ? "cursor-not-allowed opacity-50"
-                  : isDark
+                  : "cursor-pointer " + (isDark
                   ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200")
               }`}
             >
               <ChevronRight className="h-4 w-4" />

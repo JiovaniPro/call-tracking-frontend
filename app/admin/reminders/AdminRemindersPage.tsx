@@ -218,7 +218,7 @@ function AdminRemindersPageContent() {
               {filter.label}
               <button
                 onClick={filter.onRemove}
-                className="hover:opacity-70"
+                className="hover:opacity-70 cursor-pointer"
                 type="button"
               >
                 <X className="h-3 w-3" />

@@ -18,7 +18,7 @@ function AdminCallsPageContent() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [filters, setFilters] = useState<AdminCallsFilter>({
     page: 1,
-    limit: 50,
+    limit: 10,
   });
   const [search, setSearch] = useState("");
 
@@ -145,7 +145,7 @@ function AdminCallsPageContent() {
               {filter.label}
               <button
                 onClick={filter.onRemove}
-                className="hover:opacity-70"
+                className="hover:opacity-70 cursor-pointer"
                 type="button"
               >
                 <X className="h-3 w-3" />
