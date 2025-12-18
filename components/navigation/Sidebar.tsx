@@ -34,6 +34,9 @@ const userNavItems: NavItem[] = [
 const adminNavItems: NavItem[] = [
   { label: "Dashboard Admin", href: "/admin/dashboard", icon: Shield },
   { label: "Utilisateurs", href: "/admin/users", icon: Users },
+  { label: "Employés", href: "/admin/employees", icon: Users },
+  { label: "Journal des appels", href: "/admin/calls", icon: PhoneCall },
+  { label: "Rappels", href: "/admin/reminders", icon: CalendarClock },
 ];
 
 export const Sidebar: React.FC = () => {

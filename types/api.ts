@@ -7,6 +7,8 @@ export interface User {
   id: string;
   email: string;
   name: string;
+  firstName?: string | null;
+  lastName?: string | null;
   role: "ADMIN" | "USER";
   createdAt: string;
   updatedAt: string;
@@ -267,6 +269,104 @@ export interface AdminKPIReport {
   totalAppointmentsToday: number;
   totalAppointmentsThisMonth: number;
   totalRemindersToday: number;
+}
+
+// Admin - Users Stats
+export interface AdminUserStats {
+  callsToday: number;
+  appointmentsToday: number;
+  appointmentsThisMonth: number;
+  pendingReminders: number;
+  overdueReminders: number;
+  lastActivity: string | null;
+}
+
+export interface AdminUserWithStats extends AdminUser {
+  stats: AdminUserStats;
+}
+
+export interface AdminUsersStatsResponse {
+  users: AdminUserWithStats[];
+}
+
+// Admin - User Detail Stats
+export interface AdminUserDetailKPI {
+  totalCalls: number;
+  callsToday: number;
+  callsThisWeek: number;
+  callsThisMonth: number;
+  appointmentsToday: number;
+  appointmentsThisMonth: number;
+  totalReminders: number;
+  pendingReminders: number;
+  overdueReminders: number;
+  lastActivity: string | null;
+}
+
+export interface AdminUserDetailResponse {
+  user: AdminUser;
+  kpi: AdminUserDetailKPI;
+  statusStats: Record<string, number>;
+  recentCalls: Call[];
+  recentReminders: Reminder[];
+}
+
+// Admin - Calls
+export interface AdminCallsFilter {
+  userId?: string;
+  status?: CallStatus;
+  type?: CallType;
+  from?: string;
+  to?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface AdminCallsResponse {
+  calls: (Call & {
+    owner: {
+      id: string;
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+    };
+  })[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+// Admin - Reminders
+export interface AdminRemindersFilter {
+  userId?: string;
+  status?: ReminderStatus;
+  date?: string; // "today" | "week" | "month" | ISO date string
+  overdue?: boolean;
+}
+
+export interface AdminRemindersStats {
+  total: number;
+  pending: number;
+  overdue: number;
+  today: number;
+}
+
+export interface AdminReminder extends Reminder {
+  user: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+  };
+}
+
+export interface AdminRemindersResponse {
+  reminders: AdminReminder[];
+  stats: AdminRemindersStats;
 }
 
 // API Error

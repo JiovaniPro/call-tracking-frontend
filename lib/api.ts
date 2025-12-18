@@ -26,6 +26,12 @@ import type {
   UpdateUserRequest,
   ResetPasswordRequest,
   AdminKPIReport,
+  AdminUsersStatsResponse,
+  AdminUserDetailResponse,
+  AdminCallsFilter,
+  AdminCallsResponse,
+  AdminRemindersFilter,
+  AdminRemindersResponse,
 } from "../types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
@@ -403,6 +409,43 @@ export const adminApi = {
   // Reports
   getKPI: async (): Promise<AdminKPIReport> => {
     return apiFetch<AdminKPIReport>("/admin/reports/kpi");
+  },
+
+  // Users Stats
+  getUsersStats: async (): Promise<AdminUsersStatsResponse> => {
+    return apiFetch<AdminUsersStatsResponse>("/admin/users/stats");
+  },
+
+  getUserStats: async (id: string): Promise<AdminUserDetailResponse> => {
+    return apiFetch<AdminUserDetailResponse>(`/admin/users/${id}/stats`);
+  },
+
+  // Calls
+  getCalls: async (filters?: AdminCallsFilter): Promise<AdminCallsResponse> => {
+    const params = new URLSearchParams();
+    if (filters?.userId) params.append("userId", filters.userId);
+    if (filters?.status) params.append("status", filters.status);
+    if (filters?.type) params.append("type", filters.type);
+    if (filters?.from) params.append("from", filters.from);
+    if (filters?.to) params.append("to", filters.to);
+    if (filters?.search) params.append("search", filters.search);
+    if (filters?.page) params.append("page", String(filters.page));
+    if (filters?.limit) params.append("limit", String(filters.limit));
+
+    const query = params.toString();
+    return apiFetch<AdminCallsResponse>(`/admin/calls${query ? `?${query}` : ""}`);
+  },
+
+  // Reminders
+  getReminders: async (filters?: AdminRemindersFilter): Promise<AdminRemindersResponse> => {
+    const params = new URLSearchParams();
+    if (filters?.userId) params.append("userId", filters.userId);
+    if (filters?.status) params.append("status", filters.status);
+    if (filters?.date) params.append("date", filters.date);
+    if (filters?.overdue) params.append("overdue", String(filters.overdue));
+
+    const query = params.toString();
+    return apiFetch<AdminRemindersResponse>(`/admin/reminders${query ? `?${query}` : ""}`);
   },
 };
 

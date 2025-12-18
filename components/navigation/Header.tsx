@@ -34,7 +34,11 @@ export const Header: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
   const { user, isAuthenticated } = useAuth();
 
-  const firstName = user?.name ? user.name.split(" ")[0] : "";
+  // Get firstName from user object (firstName field or extract from name)
+  const firstName = user?.firstName || (user?.name ? user.name.split(" ")[0] : "");
+  const fullName = user?.name || (user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`.trim() 
+    : user?.firstName || user?.email || "");
   const roleLabel =
     user?.role === "ADMIN" ? "Administrateur" : "Utilisateur";
   // Admin = avatar LION dédié, les autres utilisateurs ont un avatar déterministe
@@ -89,9 +93,11 @@ export const Header: React.FC = () => {
               />
             </div>
             <div className="hidden text-xs leading-tight sm:block">
-              <p className="font-medium">
-                {firstName || user.name}
-              </p>
+              {firstName && (
+                <p className="font-semibold">
+                  {firstName}
+                </p>
+              )}
               <p
                 className={`text-[10px] ${
                   isDark ? "text-slate-400" : "text-slate-400"
