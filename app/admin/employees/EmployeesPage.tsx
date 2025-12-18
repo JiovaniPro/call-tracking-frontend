@@ -7,7 +7,7 @@ import { useRequireAdmin } from "../../../lib/auth";
 import { useToast } from "../../../components/ui/ToastProvider";
 import { EmployeesTable } from "../../../components/admin/EmployeesTable";
 import type { AdminUserWithStats } from "../../../types/api";
-import { Search, X, Users as UsersIcon } from "lucide-react";
+import { Search, X, Users as UsersIcon, ChevronLeft, ChevronRight } from "lucide-react";
 import { useTheme } from "../../../components/layout/AppShell";
 import { useRouter } from "next/navigation";
 
@@ -20,6 +20,8 @@ function EmployeesPageContent() {
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<"ADMIN" | "USER" | "all">("all");
   const [statusFilter, setStatusFilter] = useState<"active" | "inactive" | "all">("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
   const loadUsers = async () => {
     try {
@@ -68,6 +70,18 @@ function EmployeesPageContent() {
 
     return filtered;
   }, [users, roleFilter, statusFilter, search]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filteredUsers.length / itemsPerPage));
+  const paginatedUsers = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredUsers.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredUsers, currentPage, itemsPerPage]);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [roleFilter, statusFilter, search]);
 
   const activeFilters = useMemo(() => {
     const filters: Array<{ key: string; label: string; onRemove: () => void }> = [];
@@ -134,7 +148,7 @@ function EmployeesPageContent() {
         <select
           value={roleFilter}
           onChange={(e) => setRoleFilter(e.target.value as any)}
-          className={`rounded-xl border px-4 py-2 text-sm ${
+          className={`rounded-xl border px-4 py-2 text-sm cursor-pointer ${
             isDark
               ? "border-slate-700 bg-slate-800/50 text-slate-100"
               : "border-slate-200 bg-white text-slate-900"
@@ -148,7 +162,7 @@ function EmployeesPageContent() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as any)}
-          className={`rounded-xl border px-4 py-2 text-sm ${
+          className={`rounded-xl border px-4 py-2 text-sm cursor-pointer ${
             isDark
               ? "border-slate-700 bg-slate-800/50 text-slate-100"
               : "border-slate-200 bg-white text-slate-900"
@@ -200,10 +214,48 @@ function EmployeesPageContent() {
           <p className="text-slate-500">Aucun employé trouvé</p>
         </div>
       ) : (
-        <EmployeesTable
-          users={filteredUsers}
-          onView={handleViewEmployee}
-        />
+        <>
+          <EmployeesTable
+            users={paginatedUsers}
+            onView={handleViewEmployee}
+          />
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between">
+              <div className="text-xs text-slate-500">
+                Page {currentPage} sur {totalPages} ({filteredUsers.length} employé{filteredUsers.length > 1 ? "s" : ""})
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className={`rounded-lg px-3 py-1.5 text-xs transition ${
+                    currentPage === 1
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer " + (isDark
+                      ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200")
+                  }`}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className={`rounded-lg px-3 py-1.5 text-xs transition ${
+                    currentPage === totalPages
+                      ? "cursor-not-allowed opacity-50"
+                      : "cursor-pointer " + (isDark
+                      ? "bg-slate-800 text-slate-300 hover:bg-slate-700"
+                      : "bg-slate-100 text-slate-700 hover:bg-slate-200")
+                  }`}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

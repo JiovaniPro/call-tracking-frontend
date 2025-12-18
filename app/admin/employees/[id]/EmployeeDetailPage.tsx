@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { AppShell } from "../../../../components/layout/AppShell";
+import { AppShell, useTheme } from "../../../../components/layout/AppShell";
 import { adminApi } from "../../../../lib/api";
 import { useRequireAdmin } from "../../../../lib/auth";
 import { useToast } from "../../../../components/ui/ToastProvider";
@@ -17,6 +17,7 @@ function EmployeeDetailPageContent() {
   const params = useParams();
   const router = useRouter();
   const { showToast } = useToast();
+  const { isDark } = useTheme();
   const [data, setData] = useState<AdminUserDetailResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const userId = params.id as string;
@@ -63,7 +64,11 @@ function EmployeeDetailPageContent() {
       <div className="flex items-center gap-4">
         <button
           onClick={() => router.push("/admin/employees")}
-          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-700 dark:text-slate-300 transition hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-800 dark:hover:text-slate-100 cursor-pointer"
+          className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition cursor-pointer ${
+            isDark
+              ? "text-slate-300 hover:bg-slate-800 hover:text-slate-100"
+              : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+          }`}
         >
           <ArrowLeft className="h-4 w-4" />
           Retour
@@ -79,28 +84,47 @@ function EmployeeDetailPageContent() {
       </div>
 
       {/* Account Info */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-[#0f1a2f]">
-        <h2 className="mb-4 text-lg font-semibold text-slate-900 dark:text-slate-100">Informations du compte</h2>
+      <div
+        className={`rounded-2xl border p-6 shadow-sm ${
+          isDark
+            ? "border-slate-800 bg-[#0f1a2f] text-slate-100"
+            : "border-slate-200 bg-white text-slate-900"
+        }`}
+      >
+        <h2 className={`mb-4 text-lg font-semibold ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+          Informations du compte
+        </h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Email</p>
-            <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{user.email}</p>
+            <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>Email</p>
+            <p className={`mt-1 font-medium ${isDark ? "text-slate-100" : "text-slate-900"}`}>{user.email}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Rôle</p>
-            <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
+            <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>Rôle</p>
+            <p className={`mt-1 font-medium ${isDark ? "text-slate-100" : "text-slate-900"}`}>
               {user.role === "ADMIN" ? "Administrateur" : "Utilisateur"}
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Statut</p>
-            <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
+            <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>Statut</p>
+            <p className={`mt-1 flex items-center gap-2 font-medium ${isDark ? "text-slate-100" : "text-slate-900"}`}>
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  user.isActive
+                    ? isDark
+                      ? "bg-green-400"
+                      : "bg-green-500"
+                    : isDark
+                    ? "bg-red-400"
+                    : "bg-red-500"
+                }`}
+              />
               {user.isActive ? "Actif" : "Inactif"}
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Date de création</p>
-            <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">
+            <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>Date de création</p>
+            <p className={`mt-1 font-medium ${isDark ? "text-slate-100" : "text-slate-900"}`}>
               {new Date(user.createdAt).toLocaleDateString("fr-FR")}
             </p>
           </div>

@@ -109,8 +109,14 @@ export const EmployeesTable: React.FC<EmployeesTableProps> = ({
                         ? "border-b border-slate-800"
                         : "border-b border-slate-100"
                       : ""
+                  } ${
+                    index % 2 === 0
+                      ? isDark
+                        ? "bg-slate-800/20"
+                        : "bg-slate-50/50"
+                      : ""
                   } hover:bg-opacity-50 ${
-                    isDark ? "hover:bg-slate-800/50" : "hover:bg-slate-50"
+                    isDark ? "hover:bg-slate-800/50" : "hover:bg-slate-100"
                   } transition-colors`}
                 >
                   <td className="py-3 pr-4">
