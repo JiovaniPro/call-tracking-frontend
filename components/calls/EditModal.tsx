@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { useTheme } from "../layout/AppShell";
 import { StatusBadge, type CallStatus } from "./StatusBadge";
-import type { CallRow, CallType } from "./CallsTable";
+import type { CallRow } from "./CallsTable";
 import { DatePicker } from "./DatePicker";
 import { ALL_UI_STATUSES, STATUSES_REQUIRING_RECALL } from "../../lib/statusMapping";
 
@@ -21,7 +21,6 @@ type EditableState = {
   phone: string;
   email: string;
   status: CallStatus;
-  type: CallType;
   nextReminderDate: string;
   nextReminderSlot: string;
   description: string;
@@ -78,7 +77,6 @@ export const EditModal: React.FC<EditModalProps> = ({
       phone: call.phone,
       email: call.email ?? "",
       status: call.status,
-      type: call.type,
       nextReminderDate: recallDate,
       nextReminderSlot: recallSlot,
       description: call.description ?? "",
@@ -121,7 +119,6 @@ export const EditModal: React.FC<EditModalProps> = ({
       phone: form.phone,
       email: form.email || undefined,
       status: form.status,
-      type: form.type,
       nextReminder: combinedReminder,
       description: form.description || undefined,
     };
@@ -255,23 +252,6 @@ export const EditModal: React.FC<EditModalProps> = ({
                   </select>
                   <StatusBadge status={form.status} />
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[11px] text-slate-400">
-                  Type d'appel
-                </label>
-                <select
-                  value={form.type}
-                  onChange={(e) =>
-                    handleChange("type", e.target.value as CallType)
-                  }
-                  className={`${inputBase} ${
-                    isDark ? inputDark : inputLight
-                  }`}
-                >
-                  <option value="nouveau">Nouveau</option>
-                  <option value="rappel">Rappel</option>
-                </select>
               </div>
             </div>
           </section>

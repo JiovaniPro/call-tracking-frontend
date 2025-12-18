@@ -18,6 +18,7 @@ export type CallStatus =
 
 type StatusBadgeProps = {
   status: CallStatus;
+  recallDate?: string; // Format: "DD/MM" pour afficher dans le badge
 };
 
 const STATUS_STYLES: Record<
@@ -81,9 +82,10 @@ const STATUS_STYLES: Record<
   },
 };
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
+export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, recallDate }) => {
   const { isDark } = useTheme();
   const config = STATUS_STYLES[status];
+  const showDate = recallDate && (status === "Ne répond pas" || status === "Rappel");
 
   if (!config) {
     // Fallback for unknown status
@@ -100,11 +102,18 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
 
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
+      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${
         isDark ? config.darkClass : config.lightClass
       }`}
     >
-      {config.label}
+      <span>{config.label}</span>
+      {showDate && (
+        <span className={`text-[10px] opacity-75 ${
+          isDark ? "text-slate-200" : "text-slate-600"
+        }`}>
+          ({recallDate})
+        </span>
+      )}
     </span>
   );
 };

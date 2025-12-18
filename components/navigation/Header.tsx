@@ -1,25 +1,48 @@
 "use client";
 
 import React from "react";
-import { Moon, Sun, LogOut } from "lucide-react";
+import { Moon, Sun } from "lucide-react";
 import { useTheme } from "../layout/AppShell";
 import { NotificationBell } from "../notifications/NotificationBell";
 import { useAuth } from "../../lib/auth";
 
+// Liste d'avatars disponibles dans /public/img (animaux, etc.)
+const AVATAR_IMAGES = [
+  "/img/BIZARRE.png",
+  "/img/ELEPHANT.png",
+  "/img/RATON.png",
+  "/img/GRENOUILLE.png",
+  "/img/LAPIN.png",
+  "/img/HIBOU.png",
+  "/img/CHIEN.png",
+  "/img/PINGUIN.png",
+  "/img/PANDA.png",
+  "/img/RENARD.png",
+];
+
+// Hash très simple et déterministe pour répartir les utilisateurs sur les avatars
+const getAvatarForUser = (userId: string) => {
+  let hash = 0;
+  for (let i = 0; i < userId.length; i += 1) {
+    hash = (hash * 31 + userId.charCodeAt(i)) >>> 0;
+  }
+  const index = hash % AVATAR_IMAGES.length;
+  return AVATAR_IMAGES[index];
+};
+
 export const Header: React.FC = () => {
   const { isDark, toggleTheme } = useTheme();
-  const { user, logout, isAuthenticated } = useAuth();
-  const gradient = "linear-gradient(135deg, #6a2cff, #8c5bff)";
+  const { user, isAuthenticated } = useAuth();
 
-  // Get user initials
-  const getInitials = (name?: string) => {
-    if (!name) return "??";
-    const parts = name.split(" ");
-    if (parts.length >= 2) {
-      return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
+  const firstName = user?.name ? user.name.split(" ")[0] : "";
+  const roleLabel =
+    user?.role === "ADMIN" ? "Administrateur" : "Utilisateur";
+  // Admin = avatar LION dédié, les autres utilisateurs ont un avatar déterministe
+  const avatarSrc = !user
+    ? "/img/BIZARRE.png"
+    : user.role === "ADMIN"
+    ? "/img/ADMIN.png"
+    : getAvatarForUser(user.id);
 
   return (
     <header
@@ -32,7 +55,11 @@ export const Header: React.FC = () => {
     >
       <div>
         <h1 className="text-lg font-semibold">Statistiques d'appels</h1>
-        <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
+        <p
+          className={`text-xs ${
+            isDark ? "text-slate-400" : "text-slate-500"
+          }`}
+        >
           Suivez vos appels, conversions et rappels en un coup d'œil.
         </p>
       </div>
@@ -53,40 +80,30 @@ export const Header: React.FC = () => {
         </button>
 
         {isAuthenticated && user ? (
-          <div className="flex items-center gap-2">
-            <div
-              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white shadow-md"
-              style={{ background: gradient }}
-            >
-              {getInitials(user.name)}
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-200">
+              <img
+                src={avatarSrc}
+                alt={`Avatar de ${firstName || user.name}`}
+                className="h-full w-full object-cover"
+              />
             </div>
             <div className="hidden text-xs leading-tight sm:block">
-              <p className="font-medium">{user.name}</p>
-              <p className={`text-[10px] ${isDark ? "text-slate-400" : "text-slate-400"}`}>
-                {user.role === "ADMIN" ? "Administrateur" : "Utilisateur"}
+              <p className="font-medium">
+                {firstName || user.name}
+              </p>
+              <p
+                className={`text-[10px] ${
+                  isDark ? "text-slate-400" : "text-slate-400"
+                }`}
+              >
+                {roleLabel}
               </p>
             </div>
-            <button
-              onClick={logout}
-              className={`ml-2 flex h-8 w-8 items-center justify-center rounded-full transition ${
-                isDark
-                  ? "bg-white/5 text-slate-300 hover:bg-red-500/20 hover:text-red-400"
-                  : "bg-slate-50 text-slate-500 hover:bg-red-50 hover:text-red-500"
-              }`}
-              aria-label="Déconnexion"
-              title="Déconnexion"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
           </div>
         ) : (
-          <div className="flex items-center gap-2">
-            <div
-              className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold text-white shadow-md"
-              style={{ background: gradient }}
-            >
-              ??
-            </div>
+          <div className="flex items-center gap-2.5">
+            <div className="h-10 w-10 overflow-hidden rounded-full bg-slate-200" />
           </div>
         )}
       </div>

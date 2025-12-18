@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../lib/auth";
 
 const gradientPurple = "linear-gradient(135deg, #dd7fff, #7264ff)";
@@ -9,6 +10,7 @@ export default function ConnexionPage() {
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -23,7 +25,7 @@ export default function ConnexionPage() {
       setError(
         err instanceof Error
           ? err.message
-          : "Identifiants incorrects. Veuillez réessayer."
+          : "Identifiants incorrects. Veuillez réessayer.",
       );
     } finally {
       setIsLoading(false);
@@ -31,19 +33,27 @@ export default function ConnexionPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#f5f0ff] via-[#f6f9ff] to-[#f0fbff] px-4 py-10">
-      <div className="w-full max-w-md rounded-3xl bg-white/95 px-7 py-8 text-slate-900 shadow-[0_22px_60px_rgba(15,23,42,0.16)] backdrop-blur-xl">
-        <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <div
-            className="flex h-10 w-10 items-center justify-center rounded-2xl text-sm font-semibold text-white shadow-md"
-            style={{ background: gradientPurple }}
-          >
-            CT
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_top,_#e0e7ff_0,_#f5f0ff_35%,_#020617_100%)] px-4 py-10">
+      {/* Blobs d'arrière-plan */}
+      <div className="pointer-events-none absolute -left-32 top-[-6rem] h-64 w-64 rounded-full bg-[#dd7fff]/40 blur-3xl opacity-70" />
+      <div className="pointer-events-none absolute -right-24 bottom-[-4rem] h-64 w-64 rounded-full bg-[#54d4ef]/40 blur-3xl opacity-60" />
+
+      {/* Container avec bandes LED animées */}
+      <div className="led-container relative w-full max-w-md">
+        {/* Popup de login */}
+        <div className="relative w-full rounded-3xl bg-white/95 px-7 py-8 text-slate-900 shadow-[0_26px_70px_rgba(15,23,42,0.5)] ring-1 ring-white/60 backdrop-blur-xl animate-[fadeInUp_0.5s_ease-out] z-10">
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
+          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl">
+            <img
+              src="/logo.png"
+              alt="Call Tracking"
+              className="h-full w-full object-contain"
+            />
           </div>
           <div>
             <p className="text-sm font-semibold">Call Tracking</p>
             <p className="text-[11px] text-slate-500">
-              Connexion au dashboard d'appels
+              Connexion au dashboard d&apos;appels
             </p>
           </div>
         </div>
@@ -56,7 +66,7 @@ export default function ConnexionPage() {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="mb-4 animate-[fadeIn_0.25s_ease-out] rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
             {error}
           </div>
         )}
@@ -88,17 +98,31 @@ export default function ConnexionPage() {
             >
               Mot de passe
             </label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={isLoading}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm text-slate-900 outline-none ring-0 transition placeholder:text-slate-400 focus:border-transparent focus:bg-white focus:ring-2 focus:ring-[#7264ff]/60 disabled:opacity-50"
-            />
+            <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-2.5 text-sm text-slate-900 outline-none ring-0 transition focus-within:border-transparent focus-within:bg-white focus-within:ring-2 focus-within:ring-[#7264ff]/60">
+              <input
+                id="password"
+                type={showPassword ? "text" : "password"}
+                autoComplete="current-password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+                className="h-5 w-full bg-transparent text-sm text-slate-900 outline-none placeholder:text-slate-400 disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                className="ml-2 flex h-5 w-5 items-center justify-center text-slate-400 transition hover:text-slate-600"
+              >
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+            </div>
           </div>
           <div className="flex items-center justify-between text-[11px] text-slate-500">
             <label className="flex items-center gap-2">
@@ -112,7 +136,7 @@ export default function ConnexionPage() {
           <button
             type="submit"
             disabled={isLoading}
-            className="mt-2 inline-flex w-full items-center justify-center rounded-full px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-200 transition hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 disabled:hover:translate-y-0"
+            className="mt-2 inline-flex w-full items-center justify-center rounded-full px-4 py-2.5 text-sm font-medium text-white shadow-lg shadow-indigo-200 transition-transform duration-300 hover:-translate-y-0.5 hover:shadow-xl disabled:opacity-50 disabled:hover:translate-y-0"
             style={{ background: gradientPurple }}
           >
             {isLoading ? (
@@ -143,7 +167,102 @@ export default function ConnexionPage() {
             )}
           </button>
         </form>
+        </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translate3d(0, 12px, 0);
+          }
+          to {
+            opacity: 1;
+            transform: translate3d(0, 0, 0);
+          }
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+          }
+          to {
+            opacity: 1;
+          }
+        }
+        
+        /* Animation des bandes LED circulaires */
+        .led-container {
+          padding: 4px;
+          border-radius: 1.5rem;
+          position: relative;
+          overflow: hidden;
+        }
+        
+        .led-container::before {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: conic-gradient(
+            from 0deg,
+            transparent 0deg,
+            transparent 60deg,
+            #54d4ef 80deg,
+            #7264ff 100deg,
+            #dd7fff 120deg,
+            #7264ff 140deg,
+            #54d4ef 160deg,
+            transparent 180deg,
+            transparent 360deg
+          );
+          animation: ledRotate 3s linear infinite;
+          z-index: 0;
+        }
+        
+        .led-container::after {
+          content: '';
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: conic-gradient(
+            from 180deg,
+            transparent 0deg,
+            transparent 60deg,
+            #dd7fff 80deg,
+            #7264ff 100deg,
+            #54d4ef 120deg,
+            #7264ff 140deg,
+            #dd7fff 160deg,
+            transparent 180deg,
+            transparent 360deg
+          );
+          animation: ledRotateReverse 4s linear infinite;
+          z-index: 0;
+          opacity: 0.8;
+        }
+        
+        @keyframes ledRotate {
+          0% {
+            transform: rotate(0deg);
+          }
+          100% {
+            transform: rotate(360deg);
+          }
+        }
+        
+        @keyframes ledRotateReverse {
+          0% {
+            transform: rotate(360deg);
+          }
+          100% {
+            transform: rotate(0deg);
+          }
+        }
+      `}</style>
     </div>
   );
 }

@@ -10,6 +10,7 @@ import { useTodayReminders } from "../../lib/hooks";
 import { remindersApi } from "../../lib/api";
 import { useRequireAuth } from "../../lib/auth";
 import type { Reminder } from "../../types/api";
+import { useToast } from "../../components/ui/ToastProvider";
 
 // Map API reminder to UI format
 const mapReminderToUI = (reminder: Reminder) => ({
@@ -45,7 +46,7 @@ function TodayRemindersSection() {
   const { isDark } = useTheme();
   const { data: reminders, isLoading, error, refetch } = useTodayReminders();
   const [selectedReminder, setSelectedReminder] = useState<UIReminder | null>(null);
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const now = new Date();
   const today = now.toISOString().split("T")[0];
@@ -67,20 +68,22 @@ function TodayRemindersSection() {
     [now]
   );
 
-  const showFeedback = (message: string) => {
-    setFeedbackMessage(message);
-    setTimeout(() => setFeedbackMessage(null), 3000);
-  };
-
   const handleMarkDone = async (reminder: UIReminder) => {
     try {
       await remindersApi.markDone(reminder.id);
-      showFeedback(`"${reminder.title}" marqué comme effectué.`);
+      showToast({
+        variant: "success",
+        message: `"${reminder.title}" marqué comme effectué.`,
+      });
       refetch();
     } catch (err) {
-      showFeedback(
-        err instanceof Error ? err.message : "Erreur lors de la mise à jour"
-      );
+      showToast({
+        variant: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Erreur lors de la mise à jour du rappel",
+      });
     }
   };
 
@@ -88,12 +91,19 @@ function TodayRemindersSection() {
     if (!confirm("Voulez-vous vraiment supprimer ce rappel ?")) return;
     try {
       await remindersApi.delete(reminder.id);
-      showFeedback("Rappel supprimé.");
+      showToast({
+        variant: "success",
+        message: "Rappel supprimé.",
+      });
       refetch();
     } catch (err) {
-      showFeedback(
-        err instanceof Error ? err.message : "Erreur lors de la suppression"
-      );
+      showToast({
+        variant: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Erreur lors de la suppression du rappel",
+      });
     }
   };
 
@@ -165,19 +175,6 @@ function TodayRemindersSection() {
             </span>
           </div>
         </div>
-
-        {/* Feedback */}
-        {feedbackMessage && (
-          <div
-            className={`mb-4 rounded-xl border px-4 py-2 text-[11px] ${
-              isDark
-                ? "border-emerald-700/50 bg-emerald-900/20 text-emerald-200"
-                : "border-emerald-100 bg-emerald-50 text-emerald-700"
-            }`}
-          >
-            {feedbackMessage}
-          </div>
-        )}
 
         <div
           className={`relative -mx-2 mt-1 rounded-2xl border ${

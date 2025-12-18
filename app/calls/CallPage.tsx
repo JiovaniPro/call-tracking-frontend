@@ -12,6 +12,7 @@ import { callsApi } from "../../lib/api";
 import { useRequireAuth } from "../../lib/auth";
 import { mapApiStatusToUI, mapUIStatusToApi, STATUSES_REQUIRING_RECALL } from "../../lib/statusMapping";
 import type { Call, CallsFilter, CallStatus as ApiCallStatus, CallType as ApiCallType } from "../../types/api";
+import { useToast } from "../../components/ui/ToastProvider";
 import type { CallStatus } from "../../components/calls/StatusBadge";
 
 type DateRange = "all" | "today" | "week" | "month" | "custom";
@@ -62,13 +63,12 @@ type CallRow = ReturnType<typeof mapCallToRow>;
 
 function CallsPageInner() {
   const { isDark } = useTheme();
+  const { showToast } = useToast();
   const [search, setSearch] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState<CallStatus[]>([]);
   const [dateRange, setDateRange] = useState<DateRange>("all");
   const [callType, setCallType] = useState<UICallType | "all">("all");
   const [importOpen, setImportOpen] = useState(false);
-  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
-  const [feedbackType, setFeedbackType] = useState<"success" | "error">("success");
   const [selectedCall, setSelectedCall] = useState<CallRow | null>(null);
   const [modalMode, setModalMode] = useState<"detail" | "edit" | null>(null);
 
@@ -141,24 +141,20 @@ function CallsPageInner() {
     setCallType("all");
   };
 
-  const showFeedback = (message: string, type: "success" | "error" = "success") => {
-    setFeedbackMessage(message);
-    setFeedbackType(type);
-    setTimeout(() => setFeedbackMessage(null), 4000);
-  };
-
   const handleImport = async (file: File) => {
     try {
       const result = await callsApi.import(file, false);
-      showFeedback(
-        `Import réussi : ${result.summary.imported} appels importés, ${result.summary.skipped} ignorés.`
-      );
+      showToast({
+        variant: "success",
+        message: `Import réussi : ${result.summary.imported} appels importés, ${result.summary.skipped} ignorés.`,
+      });
       refetch();
     } catch (err) {
-      showFeedback(
-        err instanceof Error ? err.message : "Erreur lors de l'import",
-        "error"
-      );
+      showToast({
+        variant: "error",
+        message:
+          err instanceof Error ? err.message : "Erreur lors de l'import",
+      });
     }
   };
 
@@ -197,14 +193,20 @@ function CallsPageInner() {
           recallTimeSlot: recallTimeSlot || null,
         });
         
-        showFeedback("Modifications enregistrées avec succès.");
+        showToast({
+          variant: "success",
+          message: "Modifications enregistrées avec succès.",
+        });
         setModalMode("detail");
         refetch();
       } catch (err) {
-        showFeedback(
-          err instanceof Error ? err.message : "Erreur lors de la mise à jour",
-          "error"
-        );
+        showToast({
+          variant: "error",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Erreur lors de la mise à jour",
+        });
       }
     },
     [refetch]
@@ -215,13 +217,19 @@ function CallsPageInner() {
       if (!confirm("Voulez-vous vraiment supprimer cet appel ?")) return;
       try {
         await callsApi.delete(row.id);
-        showFeedback("Appel supprimé avec succès.");
+        showToast({
+          variant: "success",
+          message: "Appel supprimé avec succès.",
+        });
         refetch();
       } catch (err) {
-        showFeedback(
-          err instanceof Error ? err.message : "Erreur lors de la suppression",
-          "error"
-        );
+        showToast({
+          variant: "error",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Erreur lors de la suppression",
+        });
       }
     },
     [refetch]
@@ -285,23 +293,6 @@ function CallsPageInner() {
           onReset={resetFilters}
           onOpenImport={() => setImportOpen(true)}
         />
-
-        {/* Feedback global */}
-        {feedbackMessage && (
-          <div
-            className={`rounded-2xl border px-4 py-2 text-[11px] ${
-              feedbackType === "success"
-                ? isDark
-                  ? "border-emerald-700/50 bg-emerald-900/20 text-emerald-200"
-                  : "border-emerald-100 bg-emerald-50 text-emerald-700"
-                : isDark
-                ? "border-red-700/50 bg-red-900/20 text-red-200"
-                : "border-red-100 bg-red-50 text-red-700"
-            }`}
-          >
-            {feedbackMessage}
-          </div>
-        )}
 
         {/* Main table */}
         <CallsTable

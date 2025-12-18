@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useTheme } from "../layout/AppShell";
+import { useAuth } from "../../lib/auth";
 
 type NavItem = {
   label: string;
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { isDark } = useTheme();
+  const { logout } = useAuth();
 
   return (
     <aside
@@ -125,7 +127,9 @@ export const Sidebar: React.FC = () => {
           </span>
           Paramètres
         </a>
-          <a
+        <button
+          type="button"
+          onClick={logout}
           className={`flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition ${
             isDark
               ? "text-slate-300 hover:bg-white/5 hover:text-white"
@@ -133,11 +137,15 @@ export const Sidebar: React.FC = () => {
           }`}
           style={{ cursor: "pointer" }}
         >
-          <span className={`flex h-8 w-8 items-center justify-center rounded-xl ${isDark ? "text-white/80" : "text-[#6a2cff]"}`}>
+          <span
+            className={`flex h-8 w-8 items-center justify-center rounded-xl ${
+              isDark ? "text-white/80" : "text-[#6a2cff]"
+            }`}
+          >
             <LogOut className="h-4 w-4" />
           </span>
           Se déconnecter
-        </a>
+        </button>
       </div>
     </aside>
   );

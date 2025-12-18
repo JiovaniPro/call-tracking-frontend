@@ -14,6 +14,7 @@ import { useNotifications } from "../../lib/hooks";
 import { notificationsApi } from "../../lib/api";
 import { useRequireAuth } from "../../lib/auth";
 import type { Notification, NotificationType } from "../../types/api";
+import { useToast } from "../../components/ui/ToastProvider";
 
 const typeConfig: Record<
   NotificationType,
@@ -93,6 +94,7 @@ function NotificationsPageInner() {
   const { isDark } = useTheme();
   const [readFilter, setReadFilter] = useState<ReadFilter>("all");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
+  const { showToast } = useToast();
 
   const apiReadFilter = useMemo(() => {
     if (readFilter === "unread") return false;
@@ -120,9 +122,16 @@ function NotificationsPageInner() {
         refetch();
       } catch (err) {
         console.error("Failed to mark as read:", err);
+        showToast({
+          variant: "error",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Erreur lors du marquage de la notification",
+        });
       }
     },
-    [refetch]
+    [refetch, showToast]
   );
 
   const handleMarkAllAsRead = useCallback(async () => {
@@ -131,8 +140,15 @@ function NotificationsPageInner() {
       refetch();
     } catch (err) {
       console.error("Failed to mark all as read:", err);
+      showToast({
+        variant: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Erreur lors du marquage de toutes les notifications",
+      });
     }
-  }, [refetch]);
+  }, [refetch, showToast]);
 
   if (isLoading) {
     return (

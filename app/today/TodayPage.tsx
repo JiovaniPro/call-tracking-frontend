@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
-import { Eye, Search, Filter, RotateCcw } from "lucide-react";
+import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
+import { Eye, Search, Filter, RotateCcw, X } from "lucide-react";
 import { AppShell, useTheme } from "../../components/layout/AppShell";
 import { StatusBadge } from "../../components/calls/StatusBadge";
 import { DetailModal } from "../../components/calls/DetailModal";
@@ -10,6 +10,7 @@ import { useTodayReport } from "../../lib/hooks";
 import { useRequireAuth } from "../../lib/auth";
 import { mapApiStatusToUI, mapUIStatusToApi, STATUSES_REQUIRING_RECALL } from "../../lib/statusMapping";
 import { callsApi } from "../../lib/api";
+import { useToast } from "../../components/ui/ToastProvider";
 import type { Call } from "../../types/api";
 import type { CallStatus } from "../../components/calls/StatusBadge";
 import type { CallRow } from "../../components/calls/CallsTable";
@@ -90,6 +91,7 @@ import { ALL_UI_STATUSES } from "../../lib/statusMapping";
 
 function TodayCallsSection() {
   const { isDark } = useTheme();
+  const { showToast } = useToast();
   const { data: todayData, isLoading, error, refetch } = useTodayReport();
   const [selectedCall, setSelectedCall] = useState<CallRow | null>(null);
   const [modalMode, setModalMode] = useState<"detail" | "edit" | null>(null);
@@ -98,6 +100,21 @@ function TodayCallsSection() {
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 9;
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setStatusFilterOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
 
   // Store original calls for mapping
   const originalCalls = useMemo(() => {
@@ -105,7 +122,10 @@ function TodayCallsSection() {
   }, [todayData]);
 
   const todayCalls = useMemo(() => {
-    let calls = (todayData?.calls || []).map(mapCallToUI);
+    // Appels du jour = appels EFFECTUÉS (on exclut le statut neutre A_CONTACTER)
+    let calls = (todayData?.calls || [])
+      .filter((call) => call.status !== "A_CONTACTER")
+      .map(mapCallToUI);
     
     // Sort by occurredAt descending (last arrived first)
     calls.sort((a, b) => {
@@ -187,9 +207,16 @@ function TodayCallsSection() {
         setModalMode("detail");
       } catch (err) {
         console.error("Error updating call:", err);
+        showToast({
+          variant: "error",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Erreur lors de la mise à jour de l'appel",
+        });
       }
     },
-    [refetch]
+    [refetch, showToast]
   );
 
   const toggleStatus = (status: CallStatus) => {
@@ -200,11 +227,24 @@ function TodayCallsSection() {
     }
   };
 
+  const removeStatus = (status: CallStatus) => {
+    setSelectedStatuses(selectedStatuses.filter((s) => s !== status));
+    setCurrentPage(1);
+  };
+
+  const removeSearch = () => {
+    setSearch("");
+    setCurrentPage(1);
+  };
+
   const resetFilters = () => {
     setSearch("");
     setSelectedStatuses([]);
     setCurrentPage(1);
+    setStatusFilterOpen(false);
   };
+
+  const hasActiveFilters = search || selectedStatuses.length > 0;
 
   if (isLoading) {
     return (
@@ -225,7 +265,7 @@ function TodayCallsSection() {
           <p className="mt-1 text-xs text-red-600">{error}</p>
           <button
             onClick={() => refetch()}
-            className="mt-3 rounded-full bg-red-100 px-4 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200"
+            className="cursor-pointer mt-3 rounded-full bg-red-100 px-4 py-1.5 text-xs font-medium text-red-700 hover:bg-red-200"
           >
             Réessayer
           </button>
@@ -279,117 +319,164 @@ function TodayCallsSection() {
         </div>
 
         {/* Filters */}
-        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="flex flex-1 flex-wrap items-center gap-3">
-            {/* Search */}
-            <div
-              className={`flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-xs transition ${
-                isDark
-                  ? "border-slate-700 bg-[#020617]/40 text-slate-100 focus-within:border-[#7264ff]"
-                  : "border-slate-200 bg-white text-slate-800 focus-within:border-[#7264ff]"
-              }`}
-            >
-              <Search className="h-3.5 w-3.5 text-slate-400" />
-              <input
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setCurrentPage(1);
-                }}
-                placeholder="Rechercher (nom, téléphone, notes)…"
-                className={`h-7 flex-1 bg-transparent text-xs outline-none placeholder:text-slate-400 ${
-                  isDark ? "text-slate-100" : "text-slate-800"
-                }`}
-              />
-            </div>
-
-            {/* Status filter */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setStatusFilterOpen((v) => !v)}
-                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+        <div ref={filterRef} className="mb-4 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-1 flex-wrap items-center gap-2">
+              {/* Search */}
+              <div
+                className={`flex max-w-[300px] flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-xs transition ${
                   isDark
-                    ? "border-slate-700 bg-[#020617]/40 text-slate-100 hover:border-slate-500"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                    ? "border-slate-700 bg-[#020617]/40 text-slate-100 focus-within:border-[#7264ff]"
+                    : "border-slate-200 bg-white text-slate-800 focus-within:border-[#7264ff]"
                 }`}
               >
-                <Filter className="h-3.5 w-3.5" />
-                <span>Statut</span>
-                {selectedStatuses.length > 0 && (
-                  <span
-                    className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${
-                      isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"
-                    }`}
-                  >
-                    {selectedStatuses.length}
-                  </span>
-                )}
-              </button>
-              {statusFilterOpen && (
-                <div
-                  className={`absolute z-20 mt-1 w-52 rounded-2xl border p-2 text-xs shadow-lg ${
+                <Search className="h-3.5 w-3.5 text-slate-400" />
+                <input
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Rechercher (nom, téléphone, notes)…"
+                  className={`h-7 flex-1 bg-transparent text-xs outline-none placeholder:text-slate-400 ${
+                    isDark ? "text-slate-100" : "text-slate-800"
+                  }`}
+                />
+              </div>
+
+              {/* Status filter */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setStatusFilterOpen((v) => !v)}
+                  className={`cursor-pointer inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
                     isDark
-                      ? "border-slate-700 bg-[#020617] text-slate-100"
-                      : "border-slate-100 bg-white text-slate-800"
+                      ? "border-slate-700 bg-[#020617]/40 text-slate-100 hover:border-slate-500"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                   }`}
                 >
-                  <p className="mb-1 px-1 text-[10px] uppercase tracking-wide text-slate-400">
-                    Statuts
-                  </p>
-                  <div className="max-h-60 space-y-1 overflow-y-auto">
-                    {ALL_UI_STATUSES.map((status) => {
-                      const active = selectedStatuses.includes(status);
-                      return (
-                        <button
-                          key={status}
-                          type="button"
-                          onClick={() => {
-                            toggleStatus(status);
-                            setCurrentPage(1);
-                          }}
-                          className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-[11px] transition ${
-                            active
-                              ? isDark
-                                ? "bg-[#1d2033] text-slate-50"
-                                : "bg-[#f2ebff] text-[#4b2bb8]"
-                              : isDark
-                              ? "text-slate-200 hover:bg-white/5"
-                              : "text-slate-700 hover:bg-slate-50"
-                          }`}
-                        >
-                          <span>{status}</span>
-                          {active && (
-                            <span
-                              className={`h-1.5 w-1.5 rounded-full ${
-                                isDark ? "bg-emerald-400" : "bg-emerald-500"
-                              }`}
-                            />
-                          )}
-                        </button>
-                      );
-                    })}
+                  <Filter className="h-3.5 w-3.5" />
+                  <span>Statut</span>
+                  {selectedStatuses.length > 0 && (
+                    <span
+                      className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${
+                        isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      {selectedStatuses.length}
+                    </span>
+                  )}
+                </button>
+                {statusFilterOpen && (
+                  <div
+                    className={`absolute z-20 mt-1 w-52 rounded-2xl border p-2 text-xs shadow-lg ${
+                      isDark
+                        ? "border-slate-700 bg-[#020617] text-slate-100"
+                        : "border-slate-100 bg-white text-slate-800"
+                    }`}
+                  >
+                    <p className="mb-1 px-1 text-[10px] uppercase tracking-wide text-slate-400">
+                      Statuts
+                    </p>
+                    <div className="max-h-60 space-y-1 overflow-y-auto">
+                      {ALL_UI_STATUSES.map((status) => {
+                        const active = selectedStatuses.includes(status);
+                        return (
+                          <button
+                            key={status}
+                            type="button"
+                            onClick={() => {
+                              toggleStatus(status);
+                              setCurrentPage(1);
+                            }}
+                            className={`cursor-pointer flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-[11px] transition ${
+                              active
+                                ? isDark
+                                  ? "bg-[#1d2033] text-slate-50"
+                                  : "bg-[#f2ebff] text-[#4b2bb8]"
+                                : isDark
+                                ? "text-slate-200 hover:bg-white/5"
+                                : "text-slate-700 hover:bg-slate-50"
+                            }`}
+                          >
+                            <span>{status}</span>
+                            {active && (
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${
+                                  isDark ? "bg-emerald-400" : "bg-emerald-500"
+                                }`}
+                              />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
+          </div>
 
-            {/* Reset */}
-            {(search || selectedStatuses.length > 0) && (
+          {/* Active filters chips */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2">
+              {search && (
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium ${
+                    isDark
+                      ? "bg-slate-800/60 text-slate-200 ring-1 ring-slate-700/60"
+                      : "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
+                  }`}
+                >
+                  <span>Recherche: "{search}"</span>
+                  <button
+                    type="button"
+                    onClick={removeSearch}
+                    className={`cursor-pointer rounded-full p-0.5 transition ${
+                      isDark ? "hover:bg-slate-700" : "hover:bg-slate-200"
+                    }`}
+                    aria-label="Retirer la recherche"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {selectedStatuses.map((status) => (
+                <span
+                  key={status}
+                  className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium ${
+                    isDark
+                      ? "bg-slate-800/60 text-slate-200 ring-1 ring-slate-700/60"
+                      : "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
+                  }`}
+                >
+                  <span>Statut: {status}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeStatus(status)}
+                    className={`cursor-pointer rounded-full p-0.5 transition ${
+                      isDark ? "hover:bg-slate-700" : "hover:bg-slate-200"
+                    }`}
+                    aria-label={`Retirer le filtre ${status}`}
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              ))}
               <button
                 type="button"
                 onClick={resetFilters}
-                className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
+                className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
                   isDark
                     ? "text-slate-300 hover:bg-white/5"
                     : "text-slate-500 hover:bg-slate-100"
                 }`}
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                Réinitialiser
+                Tout réinitialiser
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         <div
@@ -423,17 +510,33 @@ function TodayCallsSection() {
           ) : (
             <>
               <div className="px-2 pb-2 pt-1">
-                <ul className="divide-y divide-slate-100 text-xs dark:divide-slate-800">
-                  {paginatedCalls.map((call) => {
+                <ul className="text-xs">
+                  {paginatedCalls.map((call, idx) => {
                     const originalCall = originalCalls.find(c => c.id === call.id);
+                    const recallDate = originalCall?.recallDate 
+                      ? new Date(originalCall.recallDate).toLocaleDateString("fr-FR", {
+                          day: "2-digit",
+                          month: "2-digit",
+                        })
+                      : null;
+                    const showDateInBadge = (call.status === "Ne répond pas" || call.status === "Rappel") && recallDate;
+                    
                     return (
                       <li
                         key={call.id}
                         className={`flex items-center gap-3 py-2.5 pl-2 pr-3 text-[13px] ${
                           isDark
+                            ? idx % 2 === 0
+                              ? "bg-[#020617]/20"
+                              : "bg-[#020617]/5"
+                            : idx % 2 === 0
+                            ? "bg-white"
+                            : "bg-slate-50/70"
+                        } ${
+                          isDark
                             ? "hover:bg-white/5"
-                            : "hover:bg-white hover:shadow-sm"
-                        } transition`}
+                            : "hover:bg-slate-50"
+                        } transition cursor-pointer`}
                       >
                         <div className="flex min-w-0 flex-1 items-center gap-3">
                           <div className="min-w-0 flex-1">
@@ -452,8 +555,11 @@ function TodayCallsSection() {
                               >
                                 {call.phone}
                               </span>
-                              <StatusBadge status={call.status} />
-                              {call.recallTimeSlot && (
+                              <StatusBadge 
+                                status={call.status} 
+                                recallDate={showDateInBadge ? recallDate : undefined}
+                              />
+                              {call.recallTimeSlot && !showDateInBadge && (
                                 <span
                                   className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
                                     isDark
@@ -484,8 +590,6 @@ function TodayCallsSection() {
                                 Aujourd'hui
                               </p>
                             </div>
-
-                            <StatusBadge status={call.status} />
                           </div>
                         </div>
 
@@ -493,7 +597,7 @@ function TodayCallsSection() {
                           type="button"
                           aria-label="Voir les détails de l'appel"
                           onClick={() => handleViewCall(call)}
-                          className={`inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
+                          className={`cursor-pointer inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
                             isDark
                               ? "bg-white/5 text-slate-200 hover:bg-white/10"
                               : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
@@ -520,13 +624,7 @@ function TodayCallsSection() {
                       type="button"
                       onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                       disabled={currentPage === 1}
-                      className={`rounded-full px-3 py-1 text-xs transition ${
-                        currentPage === 1
-                          ? "cursor-not-allowed opacity-40"
-                          : isDark
-                          ? "text-slate-300 hover:bg-white/5"
-                          : "text-slate-700 hover:bg-slate-50"
-                      }`}
+                      className={`cursor-pointer rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700`}
                     >
                       Précédent
                     </button>
@@ -534,13 +632,7 @@ function TodayCallsSection() {
                       type="button"
                       onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                       disabled={currentPage === totalPages}
-                      className={`rounded-full px-3 py-1 text-xs transition ${
-                        currentPage === totalPages
-                          ? "cursor-not-allowed opacity-40"
-                          : isDark
-                          ? "text-slate-300 hover:bg-white/5"
-                          : "text-slate-700 hover:bg-slate-50"
-                      }`}
+                      className={`cursor-pointer rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700`}
                     >
                       Suivant
                     </button>

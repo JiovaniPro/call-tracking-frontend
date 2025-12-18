@@ -8,7 +8,7 @@ import { DataTable } from "../../components/dashboard/DataTable";
 import { DonutSections } from "../../components/dashboard/DonutSections";
 import { useKPI, useTodayReport } from "../../lib/hooks";
 import { useRequireAuth } from "../../lib/auth";
-import type { Call, Reminder } from "../../types/api";
+import type { Call, Reminder, CallStatus as ApiCallStatus } from "../../types/api";
 
 // Helper to format duration
 const formatDuration = (seconds: number): string => {
@@ -18,18 +18,57 @@ const formatDuration = (seconds: number): string => {
   return `${minutes} min`;
 };
 
+// Map API status to 4 catégories colorées du DataTable
+const mapStatusToCategory = (status: ApiCallStatus): string => {
+  switch (status) {
+    case "RENDEZ_VOUS_FIXE":
+    case "RENDEZ_VOUS_REFIXE":
+    case "DEJA_CLIENT":
+      return "intéressé";
+    case "RAPPEL":
+    case "FAIRE_MAIL":
+      return "à rappeler";
+    case "NE_REPOND_PAS":
+      return "sans réponse";
+    case "MAUVAIS_NUMERO":
+      return "faux numéro";
+    default:
+      // Autres statuts (PAS_INTERESSE, NE_TRAVAILLE_PAS_EN_SUISSE, DOUBLONS…)
+      return "sans réponse";
+  }
+};
+
 // Map API call to table row format
-const mapCallToRow = (call: Call) => ({
-  id: call.id,
-  name: call.fromNumber,
-  phone: call.toNumber,
-  status: mapStatus(call.status),
-  lastCall: new Date(call.occurredAt).toLocaleTimeString("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-  }),
-  nextReminder: null,
-});
+const mapCallToRow = (call: Call) => {
+  // Nom = numéro appelant appelé (ou infos contact si besoin)
+  const name = call.direction === "INBOUND" ? call.fromNumber : call.toNumber;
+
+  // Prochain rappel uniquement pour NE_REPOND_PAS / RAPPEL avec date définie
+  let nextReminder: string | null = null;
+  if (
+    (call.status === "NE_REPOND_PAS" || call.status === "RAPPEL") &&
+    call.recallDate
+  ) {
+    const dateStr = call.recallDate.split("T")[0];
+    if (call.recallTimeSlot) {
+      nextReminder = `${dateStr} • ${call.recallTimeSlot}`;
+    } else {
+      nextReminder = dateStr;
+    }
+  }
+
+  return {
+    id: call.id,
+    name,
+    phone: call.direction === "INBOUND" ? call.fromNumber : call.toNumber,
+    status: mapStatusToCategory(call.status),
+    lastCall: new Date(call.occurredAt).toLocaleTimeString("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }),
+    nextReminder,
+  };
+};
 
 // Map API reminder to table row format
 const mapReminderToRow = (reminder: Reminder) => ({
@@ -43,18 +82,6 @@ const mapReminderToRow = (reminder: Reminder) => ({
     minute: "2-digit",
   }),
 });
-
-// Map API status to UI status
-const mapStatus = (status: string): string => {
-  const map: Record<string, string> = {
-    NEW: "intéressé",
-    IN_PROGRESS: "à rappeler",
-    COMPLETED: "intéressé",
-    MISSED: "sans réponse",
-    CANCELED: "pas intéressé",
-  };
-  return map[status] || status;
-};
 
 function DashboardContent() {
   const [kpiRange, setKpiRange] = useState<"day" | "week" | "month">("month");
@@ -101,7 +128,12 @@ function DashboardContent() {
     { month: "Mars", value: 0 },
   ];
 
-  const todayCalls = (todayData?.calls.map(mapCallToRow) || []).slice(0, 3);
+  // Journal "Appels effectués aujourd'hui" = appels déjà passés (status != A_CONTACTER)
+  const todayCalls = (
+    todayData?.calls
+      .filter((call) => call.status !== "A_CONTACTER")
+      .map(mapCallToRow) || []
+  ).slice(0, 3);
   const todayReminders = (todayData?.reminders.map(mapReminderToRow) || []).slice(0, 3);
 
   if (kpiLoading || todayLoading) {

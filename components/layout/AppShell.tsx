@@ -1,8 +1,15 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import React, {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { Sidebar } from "../navigation/Sidebar";
 import { Header } from "../navigation/Header";
+import { ToastProvider } from "../ui/ToastProvider";
 
 type ThemeContextValue = {
   isDark: boolean;
@@ -49,28 +56,30 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
       isDark,
       toggleTheme: () => setIsDark((v) => !v),
     }),
-    [isDark]
+    [isDark],
   );
 
   return (
     <ThemeContext.Provider value={value}>
-      <div
-        className={`min-h-screen bg-transparent ${
-          isDark ? "text-slate-50" : "text-slate-900"
-        }`}
-        suppressHydrationWarning
-      >
-        <Sidebar />
+      <ToastProvider>
         <div
-          className={`ml-64 flex min-h-screen flex-col ${
-            isDark ? "bg-[#0f172a]" : "bg-[#F5F7FB]"
-          } transition-colors`}
+          className={`min-h-screen bg-transparent ${
+            isDark ? "text-slate-50" : "text-slate-900"
+          }`}
           suppressHydrationWarning
         >
-          <Header />
-          <main className="flex-1 px-8 pb-10 pt-6">{children}</main>
+          <Sidebar />
+          <div
+            className={`ml-64 flex min-h-screen flex-col ${
+              isDark ? "bg-[#0f172a]" : "bg-[#F5F7FB]"
+            } transition-colors`}
+            suppressHydrationWarning
+          >
+            <Header />
+            <main className="flex-1 px-8 pb-10 pt-6">{children}</main>
+          </div>
         </div>
-      </div>
+      </ToastProvider>
     </ThemeContext.Provider>
   );
 };

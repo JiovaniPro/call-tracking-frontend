@@ -18,6 +18,7 @@ import { useSettings } from "../../lib/hooks";
 import { settingsApi, authApi } from "../../lib/api";
 import { useAuth, useRequireAuth } from "../../lib/auth";
 import type { UserSettings, UpdateSettingsRequest } from "../../types/api";
+import { useToast } from "../../components/ui/ToastProvider";
 
 type FormState = {
   name: string;
@@ -119,6 +120,7 @@ function SettingsContent() {
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const [form, setForm] = useState<FormState>({
     name: "",
@@ -174,10 +176,17 @@ function SettingsContent() {
       setSaveError(
         err instanceof Error ? err.message : "Erreur lors de la sauvegarde"
       );
+      showToast({
+        variant: "error",
+        message:
+          err instanceof Error
+            ? err.message
+            : "Erreur lors de la sauvegarde des paramètres",
+      });
     } finally {
       setIsSaving(false);
     }
-  }, [form, refetch]);
+  }, [form, refetch, showToast]);
 
   const handleLogout = useCallback(async () => {
     await logout();

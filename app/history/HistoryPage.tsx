@@ -55,7 +55,14 @@ function CallHistoryPageInner() {
   const [selectedCall, setSelectedCall] = useState<CallRow & { _apiData?: Call } | null>(null);
   const [modalMode, setModalMode] = useState<"detail" | "edit" | null>(null);
 
-  const allRows = useMemo(() => (calls || []).map(mapCallToRow), [calls]);
+  // Journal = uniquement appels EFFECTUÉS (tout sauf statut neutre A_CONTACTER)
+  const allRows = useMemo(
+    () =>
+      (calls || [])
+        .filter((call) => call.status !== "A_CONTACTER")
+        .map(mapCallToRow),
+    [calls],
+  );
 
   const filteredRows = useMemo(() => {
     let rows = allRows;
