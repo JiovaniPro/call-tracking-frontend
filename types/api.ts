@@ -222,6 +222,53 @@ export interface ImportResult {
   }[];
 }
 
+// Admin - Users
+export interface AdminUser {
+  id: string;
+  email: string;
+  firstName: string | null;
+  lastName: string | null;
+  role: "ADMIN" | "USER";
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminUserWithStats extends AdminUser {
+  stats?: {
+    callsCount: number;
+    remindersCount: number;
+  };
+}
+
+export interface CreateUserRequest {
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  role: "ADMIN" | "USER";
+}
+
+export interface UpdateUserRequest {
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  role?: "ADMIN" | "USER";
+  isActive?: boolean;
+}
+
+export interface ResetPasswordRequest {
+  newPassword: string;
+}
+
+// Admin - Reports
+export interface AdminKPIReport {
+  totalCallsToday: number;
+  totalAppointmentsToday: number;
+  totalAppointmentsThisMonth: number;
+  totalRemindersToday: number;
+}
+
 // API Error
 export interface ApiError {
   message: string;

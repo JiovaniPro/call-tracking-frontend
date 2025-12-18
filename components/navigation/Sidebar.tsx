@@ -10,6 +10,8 @@ import {
   LucideIcon,
   ListChecks,
   History,
+  Users,
+  Shield,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useTheme } from "../layout/AppShell";
@@ -21,7 +23,7 @@ type NavItem = {
   icon: LucideIcon;
 };
 
-const navItems: NavItem[] = [
+const userNavItems: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
   { label: "À appeler", href: "/calls", icon: ListChecks },
   { label: "Rappels", href: "/reminders", icon: CalendarClock },
@@ -29,10 +31,21 @@ const navItems: NavItem[] = [
   { label: "Journal des appels", href: "/history", icon: History },
 ];
 
+const adminNavItems: NavItem[] = [
+  { label: "Dashboard Admin", href: "/admin/dashboard", icon: Shield },
+  { label: "Utilisateurs", href: "/admin/users", icon: Users },
+];
+
 export const Sidebar: React.FC = () => {
   const pathname = usePathname();
   const { isDark } = useTheme();
-  const { logout } = useAuth();
+  const { logout, user, isLoading } = useAuth();
+  
+  // Determine if we're on an admin route based on pathname (more reliable than role during loading)
+  const isOnAdminRoute = pathname.startsWith("/admin");
+  // Use role as fallback if not on admin route yet, but only if user is loaded
+  const isAdmin = isOnAdminRoute || (user?.role === "ADMIN" && !isLoading);
+  const navItems = isAdmin ? adminNavItems : userNavItems;
 
   return (
     <aside
@@ -60,7 +73,7 @@ export const Sidebar: React.FC = () => {
             Call Tracking
           </p>
           <p className={`text-xs ${isDark ? "text-slate-400" : "text-slate-500"}`}>
-            Dashboard
+            {isAdmin ? "Administration" : "Dashboard"}
           </p>
         </div>
       </div>

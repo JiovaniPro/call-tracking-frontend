@@ -3,30 +3,91 @@
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../lib/auth";
+import { useToast } from "../../components/ui/ToastProvider";
 
 const gradientPurple = "linear-gradient(135deg, #dd7fff, #7264ff)";
 
+// Fonction pour transformer les messages d'erreur techniques en messages lisibles
+function getReadableErrorMessage(error: unknown): string {
+  if (!error) {
+    return "Une erreur inattendue s'est produite. Veuillez réessayer.";
+  }
+
+  if (error instanceof Error) {
+    const message = error.message.toLowerCase();
+
+    // Erreur compte désactivé (priorité haute)
+    if (
+      message.includes("compte a été désactivé") ||
+      message.includes("account_disabled") ||
+      message.includes("désactivé") ||
+      message.includes("disabled")
+    ) {
+      return "Votre compte a été désactivé. Veuillez contacter un administrateur pour réactiver votre compte.";
+    }
+
+    // Erreurs de connexion réseau
+    if (message.includes("failed to fetch") || message.includes("network error")) {
+      return "Impossible de se connecter au serveur. Vérifiez votre connexion internet.";
+    }
+
+    if (message.includes("timeout")) {
+      return "La connexion a pris trop de temps. Veuillez réessayer.";
+    }
+
+    // Erreurs d'authentification
+    if (message.includes("invalid credentials") || message.includes("unauthorized")) {
+      return "Email ou mot de passe incorrect. Veuillez vérifier vos identifiants.";
+    }
+
+    if (message.includes("email") && message.includes("required")) {
+      return "Veuillez saisir votre adresse email.";
+    }
+
+    if (message.includes("password") && message.includes("required")) {
+      return "Veuillez saisir votre mot de passe.";
+    }
+
+    // Erreurs serveur
+    if (message.includes("500") || message.includes("internal server error")) {
+      return "Une erreur serveur s'est produite. Veuillez réessayer dans quelques instants.";
+    }
+
+    if (message.includes("503") || message.includes("service unavailable")) {
+      return "Le service est temporairement indisponible. Veuillez réessayer plus tard.";
+    }
+
+    // Message par défaut si l'erreur est connue mais non mappée
+    return "Une erreur s'est produite lors de la connexion. Veuillez réessayer.";
+  }
+
+  // Si ce n'est pas une Error, message générique
+  return "Une erreur inattendue s'est produite. Veuillez réessayer.";
+}
+
 export default function ConnexionPage() {
   const { login } = useAuth();
+  const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(null);
     setIsLoading(true);
 
     try {
       await login(email, password);
+      // Succès : la redirection se fait automatiquement dans login()
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Identifiants incorrects. Veuillez réessayer.",
-      );
+      const readableMessage = getReadableErrorMessage(err);
+      showToast({
+        variant: "error",
+        title: "Erreur de connexion",
+        message: readableMessage,
+        durationMs: 6000,
+      });
     } finally {
       setIsLoading(false);
     }
@@ -64,12 +125,6 @@ export default function ConnexionPage() {
             statistiques.
           </p>
         </div>
-
-        {error && (
-          <div className="mb-4 animate-[fadeIn_0.25s_ease-out] rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 shadow-sm">
-            {error}
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">

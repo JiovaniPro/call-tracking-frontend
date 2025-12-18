@@ -10,7 +10,7 @@ import React, {
 } from "react";
 import { useRouter } from "next/navigation";
 import type { User } from "../types/api";
-import { authApi, getAccessToken, clearTokens } from "./api";
+import { authApi, getAccessToken, clearTokens, setAccessToken } from "./api";
 
 // =============================================
 // Auth Context Types
@@ -48,12 +48,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const userData = await authApi.me();
         setUser(userData);
-      } catch {
+      } catch (error: any) {
+        // Check if account is disabled
+        if (error.message?.includes("désactivé") || error.message?.includes("disabled") || error.code === "ACCOUNT_DISABLED") {
+          clearTokens();
+          setUser(null);
+          setIsLoading(false);
+          // Redirect to login with message
+          router.push("/login");
+          return;
+        }
+        
         // Token invalid, try refresh
-        const refreshed = await authApi.refresh();
-        if (refreshed) {
-          setUser(refreshed.user);
-        } else {
+        try {
+          const refreshed = await authApi.refresh();
+          if (refreshed) {
+            setUser(refreshed.user);
+          } else {
+            clearTokens();
+          }
+        } catch (refreshError: any) {
+          // Check if account is disabled during refresh
+          if (refreshError.message?.includes("désactivé") || refreshError.message?.includes("disabled") || refreshError.code === "ACCOUNT_DISABLED") {
+            clearTokens();
+            setUser(null);
+            router.push("/login");
+            return;
+          }
           clearTokens();
         }
       } finally {
@@ -62,21 +83,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     checkAuth();
-  }, []);
+  }, [router]);
 
   const login = useCallback(
     async (email: string, password: string) => {
       const res = await authApi.login({ email, password });
       setUser(res.user);
-      router.push("/dashboard");
+      // Redirect admin to admin dashboard, user to regular dashboard
+      if (res.user.role === "ADMIN") {
+        router.push("/admin/dashboard");
+      } else {
+        router.push("/dashboard");
+      }
     },
     [router]
   );
 
   const logout = useCallback(async () => {
-    await authApi.logout();
+    // Clear state immediately to prevent flash and errors
     setUser(null);
-    router.push("/login");
+    setIsLoading(false);
+    clearTokens();
+    setAccessToken(null);
+    
+    // Redirect immediately using window.location to avoid React Router issues
+    if (typeof window !== "undefined") {
+      window.location.href = "/login";
+    } else {
+      router.push("/login");
+    }
+    
+    // Call logout API in background (don't block or throw errors)
+    // Use setTimeout to ensure redirect happens first
+    setTimeout(async () => {
+      try {
+        await authApi.logout();
+      } catch {
+        // Silently ignore logout API errors - we're already logged out locally
+      }
+    }, 0);
   }, [router]);
 
   const refreshUser = useCallback(async () => {
@@ -127,5 +172,19 @@ export function useRequireAuth(redirectTo = "/login") {
   }, [isAuthenticated, isLoading, router, redirectTo]);
 
   return { isAuthenticated, isLoading };
+}
+
+// Admin-only route wrapper
+export function useRequireAdmin(redirectTo = "/dashboard") {
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || user?.role !== "ADMIN")) {
+      router.push(redirectTo);
+    }
+  }, [user, isAuthenticated, isLoading, router, redirectTo]);
+
+  return { isAdmin: user?.role === "ADMIN", isLoading };
 }
 

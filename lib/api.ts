@@ -20,6 +20,12 @@ import type {
   UserSettings,
   UpdateSettingsRequest,
   ImportResult,
+  AdminUser,
+  AdminUserWithStats,
+  CreateUserRequest,
+  UpdateUserRequest,
+  ResetPasswordRequest,
+  AdminKPIReport,
 } from "../types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api";
@@ -137,7 +143,12 @@ async function apiFetch<T>(
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ message: "An error occurred" }));
-    throw new Error(error.message || `HTTP ${res.status}`);
+    // Preserve the error message from backend, especially for account disabled
+    const errorMessage = error.error?.message || error.message || `HTTP ${res.status}`;
+    const errorCode = error.error?.code || error.code;
+    const err = new Error(errorMessage);
+    (err as any).code = errorCode;
+    throw err;
   }
 
   // Handle 204 No Content
@@ -340,6 +351,58 @@ export const settingsApi = {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+  },
+};
+
+// =============================================
+// Admin API
+// =============================================
+
+export const adminApi = {
+  // Users
+  getUsers: async (filters?: { role?: "ADMIN" | "USER"; isActive?: boolean }): Promise<AdminUser[]> => {
+    const params = new URLSearchParams();
+    if (filters?.role) params.append("role", filters.role);
+    if (filters?.isActive !== undefined) params.append("isActive", String(filters.isActive));
+
+    const query = params.toString();
+    return apiFetch<AdminUser[]>(`/admin/users${query ? `?${query}` : ""}`);
+  },
+
+  getUserById: async (id: string): Promise<AdminUserWithStats> => {
+    return apiFetch<AdminUserWithStats>(`/admin/users/${id}`);
+  },
+
+  createUser: async (data: CreateUserRequest): Promise<AdminUser> => {
+    return apiFetch<AdminUser>("/admin/users", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateUser: async (id: string, data: UpdateUserRequest): Promise<AdminUser> => {
+    return apiFetch<AdminUser>(`/admin/users/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  resetPassword: async (id: string, data: ResetPasswordRequest): Promise<void> => {
+    return apiFetch<void>(`/admin/users/${id}/reset-password`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  toggleActive: async (id: string): Promise<AdminUser> => {
+    return apiFetch<AdminUser>(`/admin/users/${id}/toggle-active`, {
+      method: "PATCH",
+    });
+  },
+
+  // Reports
+  getKPI: async (): Promise<AdminKPIReport> => {
+    return apiFetch<AdminKPIReport>("/admin/reports/kpi");
   },
 };
 

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { AppShell } from "../../components/layout/AppShell";
 import { StatCard } from "../../components/dashboard/StatCard";
 import { ChartCard } from "../../components/dashboard/ChartCard";
 import { DataTable } from "../../components/dashboard/DataTable";
 import { DonutSections } from "../../components/dashboard/DonutSections";
 import { useKPI, useTodayReport } from "../../lib/hooks";
-import { useRequireAuth } from "../../lib/auth";
+import { useRequireAuth, useAuth } from "../../lib/auth";
 import type { Call, Reminder, CallStatus as ApiCallStatus } from "../../types/api";
 
 // Helper to format duration
@@ -210,6 +211,15 @@ function DashboardContent() {
 
 export default function DashboardPage() {
   const { isLoading } = useRequireAuth();
+  const { user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    // Redirect admin to admin dashboard
+    if (!isLoading && user?.role === "ADMIN") {
+      router.push("/admin/dashboard");
+    }
+  }, [isLoading, user, router]);
 
   if (isLoading) {
     return (
@@ -217,6 +227,11 @@ export default function DashboardPage() {
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-300 border-t-[#7264ff]" />
       </div>
     );
+  }
+
+  // Don't render if admin (will redirect)
+  if (user?.role === "ADMIN") {
+    return null;
   }
 
   return (

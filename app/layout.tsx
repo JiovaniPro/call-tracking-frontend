@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { AuthProvider } from "../lib/auth";
+import { ToastProvider } from "../components/ui/ToastProvider";
 
 export const metadata: Metadata = {
   title: "Call Tracking Dashboard",
@@ -47,7 +48,9 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <AuthProvider>
+          <ToastProvider>{children}</ToastProvider>
+        </AuthProvider>
       </body>
     </html>
   );
