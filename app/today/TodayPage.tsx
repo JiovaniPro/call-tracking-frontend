@@ -1,15 +1,18 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { Eye } from "lucide-react";
+import React, { useMemo, useState, useCallback } from "react";
+import { Eye, Search, Filter, RotateCcw } from "lucide-react";
 import { AppShell, useTheme } from "../../components/layout/AppShell";
 import { StatusBadge } from "../../components/calls/StatusBadge";
 import { DetailModal } from "../../components/calls/DetailModal";
+import { EditModal } from "../../components/calls/EditModal";
 import { useTodayReport } from "../../lib/hooks";
 import { useRequireAuth } from "../../lib/auth";
-import { mapApiStatusToUI } from "../../lib/statusMapping";
+import { mapApiStatusToUI, mapUIStatusToApi, STATUSES_REQUIRING_RECALL } from "../../lib/statusMapping";
+import { callsApi } from "../../lib/api";
 import type { Call } from "../../types/api";
 import type { CallStatus } from "../../components/calls/StatusBadge";
+import type { CallRow } from "../../components/calls/CallsTable";
 
 // Map API call to UI format
 const mapCallToUI = (call: Call) => {
@@ -52,29 +55,156 @@ type UICall = ReturnType<typeof mapCallToUI> & {
   recallTimeSlot?: string;
 };
 
-// Map to CallRow for DetailModal
-const mapToCallRow = (call: UICall) => ({
-  id: call.id,
-  name: call.name,
-  phone: call.phone,
-  status: call.status,
-  lastCall: `Aujourd'hui - ${call.time}`,
-  lastCallDate: new Date().toISOString().split("T")[0],
-  nextReminder: null,
-  type: call.type as "nouveau" | "rappel",
-  description: call.notes,
-});
+// Map to CallRow for DetailModal and EditModal
+const mapToCallRow = (call: UICall, originalCall?: Call): CallRow & { _apiData?: Call } => {
+  // Format next reminder if recallDate exists
+  let nextReminder: string | null = null;
+  if (originalCall?.recallDate) {
+    const recallDateStr = originalCall.recallDate.split("T")[0];
+    if (originalCall.recallTimeSlot) {
+      nextReminder = `${recallDateStr} • ${originalCall.recallTimeSlot}`;
+    } else {
+      nextReminder = recallDateStr;
+    }
+  }
+
+  return {
+    id: call.id,
+    name: call.name,
+    phone: call.phone,
+    status: call.status,
+    lastCall: `Aujourd'hui - ${call.time}`,
+    lastCallDate: new Date().toISOString().split("T")[0],
+    nextReminder: nextReminder || undefined,
+    type: call.type as "nouveau" | "rappel",
+    description: call.notes,
+    firstName: originalCall?.firstName || undefined,
+    lastName: originalCall?.lastName || undefined,
+    email: originalCall?.email || undefined,
+    firstCallDate: originalCall?.createdAt?.split("T")[0] || undefined,
+    _apiData: originalCall,
+  };
+};
+
+import { ALL_UI_STATUSES } from "../../lib/statusMapping";
 
 function TodayCallsSection() {
   const { isDark } = useTheme();
   const { data: todayData, isLoading, error, refetch } = useTodayReport();
-  const [selectedCall, setSelectedCall] = useState<UICall | null>(null);
+  const [selectedCall, setSelectedCall] = useState<CallRow | null>(null);
+  const [modalMode, setModalMode] = useState<"detail" | "edit" | null>(null);
+  const [search, setSearch] = useState("");
+  const [selectedStatuses, setSelectedStatuses] = useState<CallStatus[]>([]);
+  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 9;
 
-  const todayCalls = useMemo(() => {
-    return (todayData?.calls || []).map(mapCallToUI);
+  // Store original calls for mapping
+  const originalCalls = useMemo(() => {
+    return todayData?.calls || [];
   }, [todayData]);
 
+  const todayCalls = useMemo(() => {
+    let calls = (todayData?.calls || []).map(mapCallToUI);
+    
+    // Sort by occurredAt descending (last arrived first)
+    calls.sort((a, b) => {
+      const callA = originalCalls.find(c => c.id === a.id);
+      const callB = originalCalls.find(c => c.id === b.id);
+      if (!callA || !callB) return 0;
+      return new Date(callB.occurredAt).getTime() - new Date(callA.occurredAt).getTime();
+    });
+
+    // Apply search filter
+    if (search) {
+      const searchLower = search.toLowerCase();
+      calls = calls.filter(
+        (call) =>
+          call.name.toLowerCase().includes(searchLower) ||
+          call.phone.includes(search) ||
+          call.notes.toLowerCase().includes(searchLower)
+      );
+    }
+
+    // Apply status filter
+    if (selectedStatuses.length > 0) {
+      calls = calls.filter((call) => selectedStatuses.includes(call.status));
+    }
+
+    return calls;
+  }, [todayData, search, selectedStatuses, originalCalls]);
+
   const totalToday = todayCalls.length;
+  const totalPages = Math.ceil(totalToday / itemsPerPage);
+  const paginatedCalls = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return todayCalls.slice(startIndex, startIndex + itemsPerPage);
+  }, [todayCalls, currentPage, itemsPerPage]);
+
+  const handleViewCall = (call: UICall) => {
+    const originalCall = originalCalls.find(c => c.id === call.id);
+    setSelectedCall(mapToCallRow(call, originalCall));
+    setModalMode("detail");
+  };
+
+  const handleSaveCall = useCallback(
+    async (updated: CallRow & { _apiData?: Call }) => {
+      try {
+        const apiData = updated._apiData;
+        if (!apiData) return;
+        
+        const newStatus = mapUIStatusToApi(updated.status);
+        
+        // Prepare recall data if status requires it
+        let recallDate: string | null = null;
+        let recallTimeSlot: string | null = null;
+        
+        if (STATUSES_REQUIRING_RECALL.includes(updated.status)) {
+          if (updated.nextReminder) {
+            // Parse nextReminder format: "YYYY-MM-DD • HH:MM – HH:MM"
+            const parts = updated.nextReminder.split(" • ");
+            if (parts.length === 2) {
+              recallDate = parts[0];
+              recallTimeSlot = parts[1];
+            } else if (parts.length === 1) {
+              recallDate = parts[0];
+            }
+          }
+        }
+        
+        await callsApi.update(apiData.id, {
+          status: newStatus,
+          notes: updated.description || apiData.notes || undefined,
+          firstName: updated.firstName,
+          lastName: updated.lastName,
+          email: updated.email,
+          toNumber: updated.phone,
+          recallDate: recallDate || null,
+          recallTimeSlot: recallTimeSlot || null,
+        });
+        
+        refetch();
+        setModalMode("detail");
+      } catch (err) {
+        console.error("Error updating call:", err);
+      }
+    },
+    [refetch]
+  );
+
+  const toggleStatus = (status: CallStatus) => {
+    if (selectedStatuses.includes(status)) {
+      setSelectedStatuses(selectedStatuses.filter((s) => s !== status));
+    } else {
+      setSelectedStatuses([...selectedStatuses, status]);
+    }
+  };
+
+  const resetFilters = () => {
+    setSearch("");
+    setSelectedStatuses([]);
+    setCurrentPage(1);
+  };
 
   if (isLoading) {
     return (
@@ -148,6 +278,120 @@ function TodayCallsSection() {
           </div>
         </div>
 
+        {/* Filters */}
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-1 flex-wrap items-center gap-3">
+            {/* Search */}
+            <div
+              className={`flex min-w-[220px] flex-1 items-center gap-2 rounded-xl border px-3 py-2 text-xs transition ${
+                isDark
+                  ? "border-slate-700 bg-[#020617]/40 text-slate-100 focus-within:border-[#7264ff]"
+                  : "border-slate-200 bg-white text-slate-800 focus-within:border-[#7264ff]"
+              }`}
+            >
+              <Search className="h-3.5 w-3.5 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => {
+                  setSearch(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Rechercher (nom, téléphone, notes)…"
+                className={`h-7 flex-1 bg-transparent text-xs outline-none placeholder:text-slate-400 ${
+                  isDark ? "text-slate-100" : "text-slate-800"
+                }`}
+              />
+            </div>
+
+            {/* Status filter */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setStatusFilterOpen((v) => !v)}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+                  isDark
+                    ? "border-slate-700 bg-[#020617]/40 text-slate-100 hover:border-slate-500"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                }`}
+              >
+                <Filter className="h-3.5 w-3.5" />
+                <span>Statut</span>
+                {selectedStatuses.length > 0 && (
+                  <span
+                    className={`ml-1 rounded-full px-1.5 py-0.5 text-[10px] ${
+                      isDark ? "bg-slate-800 text-slate-200" : "bg-slate-100 text-slate-700"
+                    }`}
+                  >
+                    {selectedStatuses.length}
+                  </span>
+                )}
+              </button>
+              {statusFilterOpen && (
+                <div
+                  className={`absolute z-20 mt-1 w-52 rounded-2xl border p-2 text-xs shadow-lg ${
+                    isDark
+                      ? "border-slate-700 bg-[#020617] text-slate-100"
+                      : "border-slate-100 bg-white text-slate-800"
+                  }`}
+                >
+                  <p className="mb-1 px-1 text-[10px] uppercase tracking-wide text-slate-400">
+                    Statuts
+                  </p>
+                  <div className="max-h-60 space-y-1 overflow-y-auto">
+                    {ALL_UI_STATUSES.map((status) => {
+                      const active = selectedStatuses.includes(status);
+                      return (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => {
+                            toggleStatus(status);
+                            setCurrentPage(1);
+                          }}
+                          className={`flex w-full items-center justify-between rounded-xl px-2.5 py-1.5 text-left text-[11px] transition ${
+                            active
+                              ? isDark
+                                ? "bg-[#1d2033] text-slate-50"
+                                : "bg-[#f2ebff] text-[#4b2bb8]"
+                              : isDark
+                              ? "text-slate-200 hover:bg-white/5"
+                              : "text-slate-700 hover:bg-slate-50"
+                          }`}
+                        >
+                          <span>{status}</span>
+                          {active && (
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${
+                                isDark ? "bg-emerald-400" : "bg-emerald-500"
+                              }`}
+                            />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Reset */}
+            {(search || selectedStatuses.length > 0) && (
+              <button
+                type="button"
+                onClick={resetFilters}
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
+                  isDark
+                    ? "text-slate-300 hover:bg-white/5"
+                    : "text-slate-500 hover:bg-slate-100"
+                }`}
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                Réinitialiser
+              </button>
+            )}
+          </div>
+        </div>
+
         <div
           className={`relative -mx-2 mt-1 rounded-2xl ${
             isDark ? "bg-[#020617]/40" : "bg-slate-50/60"
@@ -161,109 +405,170 @@ function TodayCallsSection() {
                     isDark ? "text-slate-100" : "text-slate-700"
                   }`}
                 >
-                  Aucun appel effectué aujourd'hui
+                  {search || selectedStatuses.length > 0
+                    ? "Aucun appel ne correspond aux filtres"
+                    : "Aucun appel effectué aujourd'hui"}
                 </p>
                 <p
                   className={`text-xs ${
                     isDark ? "text-slate-400" : "text-slate-500"
                   }`}
                 >
-                  Dès qu'un appel est réalisé, il apparaîtra
-                  automatiquement ici.
+                  {search || selectedStatuses.length > 0
+                    ? "Essayez de modifier vos critères de recherche"
+                    : "Dès qu'un appel est réalisé, il apparaîtra automatiquement ici."}
                 </p>
               </div>
             </div>
           ) : (
-            <div className="max-h-[360px] overflow-y-auto px-2 pb-2 pt-1">
-              <ul className="divide-y divide-slate-100 text-xs dark:divide-slate-800">
-                {todayCalls.map((call) => (
-                  <li
-                    key={call.id}
-                    className={`flex items-center gap-3 py-2.5 pl-2 pr-3 text-[13px] ${
-                      isDark
-                        ? "hover:bg-white/5"
-                        : "hover:bg-white hover:shadow-sm"
-                    } transition`}
-                  >
-                    <div className="flex min-w-0 flex-1 items-center gap-3">
-                      <div className="min-w-0 flex-1">
-                        <p
-                          className={`truncate text-sm font-medium ${
-                            isDark ? "text-slate-50" : "text-slate-900"
-                          }`}
-                        >
-                          {call.name}
-                        </p>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px]">
-                          <span
-                            className={`font-mono ${
-                              isDark ? "text-slate-200" : "text-slate-600"
-                            }`}
-                          >
-                            {call.phone}
-                          </span>
-                          <StatusBadge status={call.status} />
-                          {call.recallTimeSlot && (
-                            <span
-                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
-                                isDark
-                                  ? "bg-blue-900/40 text-blue-300"
-                                  : "bg-blue-50 text-blue-600"
+            <>
+              <div className="px-2 pb-2 pt-1">
+                <ul className="divide-y divide-slate-100 text-xs dark:divide-slate-800">
+                  {paginatedCalls.map((call) => {
+                    const originalCall = originalCalls.find(c => c.id === call.id);
+                    return (
+                      <li
+                        key={call.id}
+                        className={`flex items-center gap-3 py-2.5 pl-2 pr-3 text-[13px] ${
+                          isDark
+                            ? "hover:bg-white/5"
+                            : "hover:bg-white hover:shadow-sm"
+                        } transition`}
+                      >
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`truncate text-sm font-medium ${
+                                isDark ? "text-slate-50" : "text-slate-900"
                               }`}
                             >
-                              📅 {call.recallTimeSlot}
-                            </span>
-                          )}
+                              {call.name}
+                            </p>
+                            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[11px]">
+                              <span
+                                className={`font-mono ${
+                                  isDark ? "text-slate-200" : "text-slate-600"
+                                }`}
+                              >
+                                {call.phone}
+                              </span>
+                              <StatusBadge status={call.status} />
+                              {call.recallTimeSlot && (
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                                    isDark
+                                      ? "bg-blue-900/40 text-blue-300"
+                                      : "bg-blue-50 text-blue-600"
+                                  }`}
+                                >
+                                  📅 {call.recallTimeSlot}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right text-[11px]">
+                              <p
+                                className={
+                                  isDark ? "text-slate-200" : "text-slate-700"
+                                }
+                              >
+                                {call.time}
+                              </p>
+                              <p
+                                className={
+                                  isDark ? "text-slate-500" : "text-slate-500"
+                                }
+                              >
+                                Aujourd'hui
+                              </p>
+                            </div>
+
+                            <StatusBadge status={call.status} />
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-3">
-                        <div className="text-right text-[11px]">
-                          <p
-                            className={
-                              isDark ? "text-slate-200" : "text-slate-700"
-                            }
-                          >
-                            {call.time}
-                          </p>
-                          <p
-                            className={
-                              isDark ? "text-slate-500" : "text-slate-500"
-                            }
-                          >
-                            Aujourd'hui
-                          </p>
-                        </div>
+                        <button
+                          type="button"
+                          aria-label="Voir les détails de l'appel"
+                          onClick={() => handleViewCall(call)}
+                          className={`inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
+                            isDark
+                              ? "bg-white/5 text-slate-200 hover:bg-white/10"
+                              : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                          }`}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
 
-                        <StatusBadge status={call.status} />
-                      </div>
-                    </div>
-
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className={`mt-3 flex items-center justify-between border-t px-4 py-3 text-[11px] ${
+                  isDark ? "border-slate-800 text-slate-400" : "border-slate-100 text-slate-500"
+                }`}>
+                  <span>
+                    Page {currentPage} sur {totalPages} ({totalToday} appel{totalToday > 1 ? "s" : ""})
+                  </span>
+                  <div className="inline-flex items-center gap-1">
                     <button
                       type="button"
-                      aria-label="Voir les détails de l'appel"
-                      onClick={() => setSelectedCall(call)}
-                      className={`inline-flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${
-                        isDark
-                          ? "bg-white/5 text-slate-200 hover:bg-white/10"
-                          : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className={`rounded-full px-3 py-1 text-xs transition ${
+                        currentPage === 1
+                          ? "cursor-not-allowed opacity-40"
+                          : isDark
+                          ? "text-slate-300 hover:bg-white/5"
+                          : "text-slate-700 hover:bg-slate-50"
                       }`}
                     >
-                      <Eye className="h-3.5 w-3.5" />
+                      Précédent
                     </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className={`rounded-full px-3 py-1 text-xs transition ${
+                        currentPage === totalPages
+                          ? "cursor-not-allowed opacity-40"
+                          : isDark
+                          ? "text-slate-300 hover:bg-white/5"
+                          : "text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      Suivant
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </section>
 
       <DetailModal
-        open={!!selectedCall}
-        call={selectedCall ? mapToCallRow(selectedCall) : null}
-        onClose={() => setSelectedCall(null)}
-        onEdit={() => undefined}
+        open={modalMode === "detail" && !!selectedCall}
+        call={selectedCall}
+        onClose={() => {
+          setModalMode(null);
+          setSelectedCall(null);
+        }}
+        onEdit={() => setModalMode("edit")}
+      />
+
+      <EditModal
+        open={modalMode === "edit" && !!selectedCall}
+        call={selectedCall}
+        onClose={() => {
+          setModalMode("detail");
+        }}
+        onSave={handleSaveCall}
       />
     </>
   );

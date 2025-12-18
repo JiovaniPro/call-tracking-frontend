@@ -1,6 +1,6 @@
- "use client";
+"use client";
 
-import React from "react";
+import React, { useState, useMemo } from "react";
 import { Eye } from "lucide-react";
 import { useTheme } from "../layout/AppShell";
 import { StatusBadge, type CallStatus } from "./StatusBadge";
@@ -17,16 +17,20 @@ export type CallHistoryEntry = {
 
 export type CallRow = {
   id: string;
+  // Nom complet (fallback pour les vues qui n'ont pas besoin de distinguer)
   name: string;
+  // Détail du nom pour la vue "Tous les appels"
+  firstName?: string;
+  lastName?: string;
   phone: string;
   status: CallStatus;
   lastCall: string;
   lastCallDate?: string;
   nextReminder?: string | null;
   type: CallType;
+  // Vague de prospection (import)
+  waveNumber?: number | null;
   // Champs pour les modals
-  firstName?: string;
-  lastName?: string;
   email?: string;
   firstCallDate?: string;
   description?: string;
@@ -47,6 +51,16 @@ export const CallsTable: React.FC<CallsTableProps> = ({
   onDelete,
 }) => {
   const { isDark } = useTheme();
+  const itemsPerPage = 9;
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const totalRows = rows.length;
+  const totalPages = Math.max(1, Math.ceil(totalRows / itemsPerPage));
+
+  const paginatedRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return rows.slice(startIndex, startIndex + itemsPerPage);
+  }, [rows, currentPage]);
 
   return (
     <div
@@ -60,7 +74,8 @@ export const CallsTable: React.FC<CallsTableProps> = ({
         <div>
           <p className="text-sm font-semibold">Tous les appels</p>
           <p className="text-[11px] text-slate-400">
-            Vue consolidée de l’ensemble des appels et rappels enregistrés.
+            File d&apos;attente des prospects importés, jamais appelés. Appelez et
+            qualifiez chaque ligne de haut en bas.
           </p>
         </div>
         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500 dark:bg-slate-900/60 dark:text-slate-300">
@@ -69,7 +84,7 @@ export const CallsTable: React.FC<CallsTableProps> = ({
       </div>
 
       <div className="relative -mx-3 mt-1">
-        <div className="max-h-[520px] overflow-y-auto px-3 pb-2">
+        <div className="px-3 pb-2">
           <table
             className={`min-w-full border-separate border-spacing-0 text-left text-xs ${
               isDark ? "text-slate-300" : "text-slate-600"
@@ -82,7 +97,13 @@ export const CallsTable: React.FC<CallsTableProps> = ({
                 }`}
               >
                 <th className="sticky top-0 z-10 bg-inherit py-2 pr-4">
-                  Nom & prénom
+                  Vague
+                </th>
+                <th className="sticky top-0 z-10 bg-inherit px-4 py-2">
+                  Nom
+                </th>
+                <th className="sticky top-0 z-10 bg-inherit px-4 py-2">
+                  Prénom
                 </th>
                 <th className="sticky top-0 z-10 bg-inherit px-4 py-2">
                   Téléphone
@@ -90,16 +111,13 @@ export const CallsTable: React.FC<CallsTableProps> = ({
                 <th className="sticky top-0 z-10 bg-inherit px-4 py-2">
                   Statut
                 </th>
-                <th className="sticky top-0 z-10 bg-inherit px-4 py-2">
-                  Dernier appel
-                </th>
                 <th className="sticky top-0 z-10 bg-inherit px-4 py-2 text-right">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((row, idx) => (
+              {paginatedRows.map((row, idx) => (
                 <tr
                   key={row.id}
                   className={`text-[13px] ${
@@ -117,10 +135,57 @@ export const CallsTable: React.FC<CallsTableProps> = ({
                   } transition`}
                 >
                   <td className="whitespace-nowrap py-3 pr-4 font-medium">
+                    {row.waveNumber != null ? (
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                          // Couleurs différentes par vague (cycle sur quelques teintes)
+                          row.waveNumber % 5 === 1
+                            ? isDark
+                              ? "bg-violet-900/60 text-violet-200 ring-1 ring-violet-500/60"
+                              : "bg-violet-50 text-violet-700 ring-1 ring-violet-200"
+                            : row.waveNumber % 5 === 2
+                            ? isDark
+                              ? "bg-sky-900/60 text-sky-200 ring-1 ring-sky-500/60"
+                              : "bg-sky-50 text-sky-700 ring-1 ring-sky-200"
+                            : row.waveNumber % 5 === 3
+                            ? isDark
+                              ? "bg-emerald-900/60 text-emerald-200 ring-1 ring-emerald-500/60"
+                              : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200"
+                            : row.waveNumber % 5 === 4
+                            ? isDark
+                              ? "bg-amber-900/60 text-amber-200 ring-1 ring-amber-500/60"
+                              : "bg-amber-50 text-amber-700 ring-1 ring-amber-200"
+                            : isDark
+                            ? "bg-rose-900/60 text-rose-200 ring-1 ring-rose-500/60"
+                            : "bg-rose-50 text-rose-700 ring-1 ring-rose-200"
+                        }`}
+                      >
+                        Vague {row.waveNumber}
+                      </span>
+                    ) : (
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                          isDark
+                            ? "bg-slate-900/40 text-slate-500 ring-1 ring-slate-700/60"
+                            : "bg-slate-100 text-slate-400 ring-1 ring-slate-200"
+                        }`}
+                      >
+                        Vague n/d
+                      </span>
+                    )}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3 font-medium">
                     <span
                       className={isDark ? "text-slate-100" : "text-slate-900"}
                     >
-                      {row.name}
+                      {row.lastName || row.name}
+                    </span>
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-3">
+                    <span
+                      className={isDark ? "text-slate-100" : "text-slate-900"}
+                    >
+                      {row.firstName || ""}
                     </span>
                   </td>
                   <td className="whitespace-nowrap px-4 py-3">
@@ -139,25 +204,31 @@ export const CallsTable: React.FC<CallsTableProps> = ({
                   <td className="px-4 py-3">
                     <StatusBadge status={row.status} />
                   </td>
-                  <td
-                    className={`whitespace-nowrap px-4 py-3 ${
-                      isDark ? "text-slate-400" : "text-slate-500"
-                    }`}
-                  >
-                    {row.lastCall}
-                  </td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex items-center gap-1.5">
+                      {onEdit && (
+                        <button
+                          type="button"
+                          aria-label="Appeler et qualifier le prospect"
+                          onClick={() => onEdit?.(row)}
+                          className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full ${
+                            isDark
+                              ? "bg-[#1d2939] text-emerald-300 hover:bg-emerald-500/20"
+                              : "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100 hover:bg-emerald-100"
+                          }`}
+                        >
+                          <span className="text-[11px] font-semibold">📞</span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         aria-label="Voir les détails de l'appel"
                         onClick={() => onView?.(row)}
-                        className={`inline-flex h-7 w-7 items-center justify-center rounded-full ${
+                        className={`inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-full ${
                           isDark
                             ? "bg-white/5 text-slate-200 hover:bg-white/10"
-                            : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+                            : "bg-white text-slate-600 ring-1 ring-slate-200 hover:bg-slate-50"
                         }`}
-                        style={{ cursor: "pointer" }}
                       >
                         <Eye className="h-3.5 w-3.5" />
                       </button>
@@ -169,7 +240,7 @@ export const CallsTable: React.FC<CallsTableProps> = ({
               {rows.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="py-10 text-center text-xs text-slate-400"
                   >
                     Aucun appel ne correspond à vos filtres. Essayez de
@@ -186,21 +257,26 @@ export const CallsTable: React.FC<CallsTableProps> = ({
         </div>
       </div>
 
-      {/* Pagination mock */}
+      {/* Pagination réelle */}
       <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
-        <span>Page 1 sur 5 (mock)</span>
+        <span>
+          Page {currentPage} sur {totalPages} ({totalRows} ligne
+          {totalRows > 1 ? "s" : ""})
+        </span>
         <div className="inline-flex items-center gap-1">
           <button
             type="button"
-            className="rounded-full px-2 py-1 text-xs text-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:hover:bg-white/5"
-            disabled
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            className="cursor-pointer rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-600 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+            disabled={currentPage === 1}
           >
             Précédent
           </button>
           <button
             type="button"
-            className="rounded-full px-2 py-1 text-xs text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed dark:text-slate-100 dark:hover:bg-white/5"
-            disabled
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            className="cursor-pointer rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700 hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700"
+            disabled={currentPage === totalPages || totalRows === 0}
           >
             Suivant
           </button>

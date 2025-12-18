@@ -9,6 +9,7 @@ import {
   LogOut,
   LucideIcon,
   ListChecks,
+  History,
 } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useTheme } from "../layout/AppShell";
@@ -21,9 +22,10 @@ type NavItem = {
 
 const navItems: NavItem[] = [
   { label: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Tous les appels", href: "/calls", icon: ListChecks },
-  { label: "Appels du jour", href: "/today", icon: PhoneCall },
+  { label: "À appeler", href: "/calls", icon: ListChecks },
   { label: "Rappels", href: "/reminders", icon: CalendarClock },
+  { label: "Appels effectués aujourd’hui", href: "/today", icon: PhoneCall },
+  { label: "Journal des appels", href: "/history", icon: History },
 ];
 
 export const Sidebar: React.FC = () => {

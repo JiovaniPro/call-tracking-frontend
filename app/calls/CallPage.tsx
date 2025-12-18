@@ -37,8 +37,8 @@ const mapCallToRow = (call: Call) => {
   return {
     id: call.id,
     name: fullName,
-    firstName: firstName,
-    lastName: lastName,
+    firstName,
+    lastName,
     phone: call.direction === "INBOUND" ? call.fromNumber : call.toNumber,
     status: mapApiStatusToUI(call.status),
     lastCall: new Date(call.occurredAt).toLocaleDateString("fr-FR", {
@@ -52,6 +52,7 @@ const mapCallToRow = (call: Call) => {
     email: call.email || "",
     firstCallDate: call.createdAt.split("T")[0],
     description: call.notes || "",
+    waveNumber: call.waveNumber ?? null,
     // Keep original API data for updates
     _apiData: call,
   };
@@ -100,11 +101,37 @@ function CallsPageInner() {
   const { data: calls, isLoading, error, refetch } = useCalls(apiFilters);
 
   const rows = useMemo(() => {
-    // Only show calls that haven't been classified yet (status = A_CONTACTER)
-    // After classification, they appear in "Appels du jour"
-    return (calls || [])
-      .filter((call) => call.status === "A_CONTACTER")
-      .map(mapCallToRow);
+    // "Tous les appels" = uniquement prospects importés, jamais appelés
+    // 1) Filtre sur le statut neutre A_CONTACTER
+    // 2) Tri par vague croissante (Vague 1, puis 2, etc.)
+    // 3) À l'intérieur d'une vague, tri alphabétique fixe Nom > Prénom
+    const filtered = (calls || []).filter((call) => call.status === "A_CONTACTER");
+
+    const mapped = filtered.map(mapCallToRow);
+
+    // Tri : vague ASC (vagues définies d'abord, puis sans vague), puis Nom / Prénom
+    mapped.sort((a, b) => {
+      const waveA = a.waveNumber ?? Number.MAX_SAFE_INTEGER;
+      const waveB = b.waveNumber ?? Number.MAX_SAFE_INTEGER;
+
+      if (waveA < waveB) return -1;
+      if (waveA > waveB) return 1;
+
+      const lastA = (a.lastName || a.name || "").toLocaleLowerCase("fr-FR");
+      const lastB = (b.lastName || b.name || "").toLocaleLowerCase("fr-FR");
+
+      if (lastA < lastB) return -1;
+      if (lastA > lastB) return 1;
+
+      const firstA = (a.firstName || "").toLocaleLowerCase("fr-FR");
+      const firstB = (b.firstName || "").toLocaleLowerCase("fr-FR");
+      if (firstA < firstB) return -1;
+      if (firstA > firstB) return 1;
+
+      return 0;
+    });
+
+    return mapped;
   }, [calls]);
 
   const resetFilters = () => {

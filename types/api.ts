@@ -43,6 +43,8 @@ export interface Call {
   direction: CallDirection;
   type: CallType;
   status: CallStatus;
+  // Numéro de vague (lot d'import) propre à l'utilisateur, immuable
+  waveNumber?: number | null;
   fromNumber: string;
   toNumber: string;
   durationSec: number | null;
@@ -169,6 +171,16 @@ export interface TodayReport {
   reminders: Reminder[];
   callsToday?: number;
   appointmentsToday?: number;
+}
+
+export interface StatusStatsReport {
+  range: {
+    from: string;
+    to: string;
+  };
+  totalCalls: number;
+  statusCounts: Record<string, number>;
+  statusPercentages: Record<string, number>;
 }
 
 // Settings

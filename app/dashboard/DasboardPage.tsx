@@ -69,6 +69,15 @@ function DashboardContent() {
       trend: { value: "+0%", direction: "up" as const },
     },
     {
+      label: "Rappels à faire",
+      value: todayData?.reminders.length.toString() || "0",
+      helper: "rappels prévus aujourd'hui",
+      trend: { value: "+0%", direction: "up" as const },
+    },
+  ];
+
+  const appointmentCards = [
+    {
       label: "Rendez-vous aujourd'hui",
       value: todayData?.appointmentsToday?.toString() || "0",
       helper: "rendez-vous fixés aujourd'hui",
@@ -78,12 +87,6 @@ function DashboardContent() {
       label: "Rendez-vous ce mois",
       value: kpi?.appointmentsThisMonth?.toString() || "0",
       helper: "total de rendez-vous fixés ce mois",
-      trend: { value: "+0%", direction: "up" as const },
-    },
-    {
-      label: "Rappels à faire",
-      value: todayData?.reminders.length.toString() || "0",
-      helper: "rappels prévus aujourd'hui",
       trend: { value: "+0%", direction: "up" as const },
     },
   ];
@@ -98,8 +101,8 @@ function DashboardContent() {
     { month: "Mars", value: 0 },
   ];
 
-  const todayCalls = todayData?.calls.map(mapCallToRow) || [];
-  const todayReminders = todayData?.reminders.map(mapReminderToRow) || [];
+  const todayCalls = (todayData?.calls.map(mapCallToRow) || []).slice(0, 3);
+  const todayReminders = (todayData?.reminders.map(mapReminderToRow) || []).slice(0, 3);
 
   if (kpiLoading || todayLoading) {
     return (
@@ -144,6 +147,12 @@ function DashboardContent() {
           {kpiCards.map((card) => (
             <StatCard key={card.label} {...card} />
           ))}
+          {/* Rendez-vous cards côte à côte */}
+          <div className="grid grid-cols-2 gap-4">
+            {appointmentCards.map((card) => (
+              <StatCard key={card.label} {...card} />
+            ))}
+          </div>
         </div>
       </div>
 
@@ -151,14 +160,16 @@ function DashboardContent() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <DataTable
-          title="Appels du jour"
+          title="Appels effectués aujourd'hui"
           rows={todayCalls}
           emptyMessage="Aucun appel aujourd'hui"
+          viewAllLink="/today"
         />
         <DataTable
           title="Rappels du jour"
           rows={todayReminders}
           emptyMessage="Aucun rappel aujourd'hui"
+          viewAllLink="/reminders"
         />
       </div>
     </div>

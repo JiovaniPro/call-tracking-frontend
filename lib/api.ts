@@ -16,6 +16,7 @@ import type {
   Notification,
   KPIReport,
   TodayReport,
+  StatusStatsReport,
   UserSettings,
   UpdateSettingsRequest,
   ImportResult,
@@ -318,6 +319,10 @@ export const reportsApi = {
 
   getToday: async (): Promise<TodayReport> => {
     return apiFetch<TodayReport>("/reports/today");
+  },
+
+  getStatusStats: async (range: "day" | "week" | "month" = "month"): Promise<StatusStatsReport> => {
+    return apiFetch<StatusStatsReport>(`/reports/status-stats?range=${range}`);
   },
 };
 

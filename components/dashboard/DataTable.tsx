@@ -19,6 +19,7 @@ type DataTableProps = {
   title: string;
   rows: CallRow[];
   emptyMessage?: string;
+  viewAllLink?: string;
 };
 
 const statusConfig: Record<
@@ -51,7 +52,7 @@ const statusConfig: Record<
   },
 };
 
-export const DataTable: React.FC<DataTableProps> = ({ title, rows, emptyMessage = "Aucune donnée" }) => {
+export const DataTable: React.FC<DataTableProps> = ({ title, rows, emptyMessage = "Aucune donnée", viewAllLink }) => {
   const { isDark } = useTheme();
 
   // Safe status lookup with fallback
@@ -71,14 +72,16 @@ export const DataTable: React.FC<DataTableProps> = ({ title, rows, emptyMessage 
     >
       <div className="mb-4 flex items-center justify-between gap-4">
         <p className="text-sm font-medium">{title}</p>
-        <button
-          className={`text-xs font-medium ${
-            isDark ? "text-[#bfa7ff] hover:text-[#d4c6ff]" : "text-[#6a2cff] hover:text-[#5823cf]"
-          }`}
-          style={{ cursor: "pointer" }}
-        >
-          Voir tout
-        </button>
+        {viewAllLink && (
+          <a
+            href={viewAllLink}
+            className={`text-xs font-medium transition ${
+              isDark ? "text-[#bfa7ff] hover:text-[#d4c6ff]" : "text-[#6a2cff] hover:text-[#5823cf]"
+            }`}
+          >
+            Voir tout
+          </a>
+        )}
       </div>
       <div className="overflow-x-auto">
         <table

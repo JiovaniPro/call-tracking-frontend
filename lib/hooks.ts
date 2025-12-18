@@ -112,6 +112,10 @@ export function useTodayReport() {
   return useApi<TodayReport>(() => reportsApi.getToday(), []);
 }
 
+export function useStatusStats(range: "day" | "week" | "month" = "month") {
+  return useApi<StatusStatsReport>(() => reportsApi.getStatusStats(range), [range]);
+}
+
 // =============================================
 // Settings Hooks
 // =============================================

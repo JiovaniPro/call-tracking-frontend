@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { CalendarRange, Filter, RotateCcw, Search } from "lucide-react";
 import { useTheme } from "../layout/AppShell";
 import type { CallStatus } from "./StatusBadge";
+import { ALL_UI_STATUSES } from "../../lib/statusMapping";
 
 type DateRange = "all" | "today" | "week" | "month" | "custom";
 type CallType = "all" | "nouveau" | "rappel";
@@ -20,14 +21,6 @@ type FilterBarProps = {
   onReset: () => void;
   onOpenImport: () => void;
 };
-
-const ALL_STATUSES: CallStatus[] = [
-  "intéressé",
-  "pas intéressé",
-  "répondeur",
-  "hors cible",
-  "faux numéro",
-];
 
 export const FilterBar: React.FC<FilterBarProps> = ({
   search,
@@ -81,7 +74,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           <button
             type="button"
             onClick={() => setStatusOpen((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
+            className={`inline-flex cursor-pointer items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-medium transition ${
               isDark
                 ? "border-slate-700 bg-[#020617]/40 text-slate-100 hover:border-slate-500"
                 : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
@@ -111,7 +104,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                 Statuts
               </p>
               <div className="space-y-1">
-                {ALL_STATUSES.map((status) => {
+                {ALL_UI_STATUSES.map((status) => {
                   const active = selectedStatuses.includes(status);
                   return (
                     <button
@@ -128,7 +121,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
                           : "text-slate-700 hover:bg-slate-50"
                       }`}
                     >
-                      <span>{status}</span>
+                      <span className="cursor-pointer">{status}</span>
                       {active && (
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${
@@ -156,7 +149,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               key={item.id}
               type="button"
               onClick={() => onDateRangeChange(item.id as DateRange)}
-              className={`rounded-full px-2 py-0.5 transition ${
+              className={`cursor-pointer rounded-full px-2 py-0.5 transition ${
                 dateRange === item.id
                   ? isDark
                     ? "bg-white/10 text-slate-50"
@@ -197,7 +190,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
               key={item.id}
               type="button"
               onClick={() => onCallTypeChange(item.id as CallType)}
-              className={`rounded-full px-2 py-0.5 transition ${
+              className={`cursor-pointer rounded-full px-2 py-0.5 transition ${
                 callType === item.id
                   ? isDark
                     ? "bg-white/10 text-slate-50"
@@ -219,7 +212,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
             onReset();
             setStatusOpen(false);
           }}
-          className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
+          className={`inline-flex cursor-pointer items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
             isDark
               ? "text-slate-300 hover:bg-white/5"
               : "text-slate-500 hover:bg-slate-100"
@@ -236,7 +229,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({
           type="button"
           onClick={onOpenImport}
           title="Importer un fichier .xlsx ou .csv pour ajouter des appels"
-          className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-slate-50 shadow-md shadow-indigo-200/40 transition hover:-translate-y-0.5 hover:shadow-lg"
+          className="inline-flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-xs font-medium text-slate-50 shadow-md shadow-indigo-200/40 transition hover:-translate-y-0.5 hover:shadow-lg"
           style={{ background: gradientPurple }}
         >
           <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/10">
